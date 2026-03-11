@@ -2,9 +2,10 @@
 
 <div align="center">
 
-[![Docker Image](https://ghcr-badge.deta.dev/spadesa99/xray_ui/latest_tag?trim=major&label=Latest)](https://github.com/SpadesA99/xray_ui/pkgs/container/xray_ui)
-[![Docker Pulls](https://ghcr-badge.deta.dev/spadesa99/xray_ui/size?tag=feature-sing-box&label=Size)](https://github.com/SpadesA99/xray_ui/pkgs/container/xray_ui)
-[![Build Status](https://github.com/SpadesA99/xray_ui/actions/workflows/docker-build.yml/badge.svg)](https://github.com/SpadesA99/xray_ui/actions)
+[![Docker Image](https://img.shields.io/badge/ghcr.io-singbox__ui-blue?logo=docker)](https://github.com/SpadesA99/singbox_ui/pkgs/container/singbox_ui)
+[![Build Status](https://github.com/SpadesA99/singbox_ui/actions/workflows/docker-build.yml/badge.svg)](https://github.com/SpadesA99/singbox_ui/actions)
+[![GitHub Stars](https://img.shields.io/github/stars/SpadesA99/singbox_ui?style=flat&logo=github)](https://github.com/SpadesA99/singbox_ui/stargazers)
+[![License](https://img.shields.io/github/license/SpadesA99/singbox_ui)](LICENSE)
 
 **现代化的 sing-box 配置管理工具**
 
@@ -83,7 +84,7 @@
 ```yaml
 services:
   singbox-ui:
-    image: ghcr.io/spadesa99/xray_ui:feature-sing-box
+    image: ghcr.io/spadesa99/singbox_ui:feature-sing-box
     container_name: singbox-ui
     restart: unless-stopped
     network_mode: host
@@ -148,6 +149,10 @@ ssh -L 7000:127.0.0.1:7000 user@your-server
 ## 许可证
 
 [MIT License](LICENSE)
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=SpadesA99/singbox_ui&type=Date)](https://star-history.com/#SpadesA99/singbox_ui&Date)
 
 ## 致谢
 

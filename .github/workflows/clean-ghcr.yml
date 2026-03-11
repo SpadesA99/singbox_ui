@@ -1,7 +1,7 @@
-name: Clean xray_ui GHCR Images
+name: Clean singbox_ui GHCR Images
 
 on:
-  workflow_dispatch:   # 手动触发（最接近一键）
+  workflow_dispatch:   # 手动触发
 
 permissions:
   packages: write
@@ -10,12 +10,11 @@ jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - name: Delete old versions of xray_ui
+      - name: Delete old versions of singbox_ui
         uses: actions/delete-package-versions@v5
         with:
-          package-name: 'xray_ui'                    # ← 你的镜像名
+          package-name: 'singbox_ui'
           package-type: 'container'
-          min-versions-to-keep: 2                    # 保留最近 2 个版本（建议 1~3）
-          delete-only-untagged-versions: 'false'     # false = 也删旧的 tagged 版本（如 branch-xxx）
+          min-versions-to-keep: 2
+          delete-only-untagged-versions: 'false'
           token: ${{ secrets.GITHUB_TOKEN }}
-          # dry-run: 'true'                          # 先打开这个测试，看会删什么（不实际删除）

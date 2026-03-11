@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   singbox-ui:
-    image: ghcr.io/spadesa99/xray_ui:feature-sing-box
+    image: ghcr.io/spadesa99/singbox_ui:feature-sing-box
     container_name: singbox-ui
     restart: unless-stopped
     network_mode: host
