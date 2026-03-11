@@ -108,9 +108,6 @@ func main() {
 			prober.POST("/save", handlers.SaveProbeResultsToSubscription)
 		}
 
-		// WebSocket
-		api.GET("/ws", handlers.WebSocketHandler)
-		api.GET("/ws/status", handlers.GetWebSocketStatus)
 	}
 
 	// 健康检查

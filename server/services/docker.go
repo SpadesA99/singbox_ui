@@ -349,22 +349,6 @@ func (d *DockerService) execInContainer(cmd ...string) (string, error) {
 	return output, nil
 }
 
-// FollowContainerLogs 流式获取容器日志（用于 WebSocket）
-func (d *DockerService) FollowContainerLogs(ctx context.Context, tail string) (io.ReadCloser, error) {
-	if tail == "" {
-		tail = "10"
-	}
-
-	options := types.ContainerLogsOptions{
-		ShowStdout: true,
-		ShowStderr: true,
-		Follow:     true,
-		Tail:       tail,
-		Timestamps: true,
-	}
-
-	return d.cli.ContainerLogs(ctx, SingBoxContainerName, options)
-}
 
 // GetNamedContainerName 获取命名配置的容器名称
 func GetNamedContainerName(configName string) string {

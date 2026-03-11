@@ -71,12 +71,12 @@
 
 - 异步多节点并发探测
 - 成功率滑动窗口统计
-- WebSocket 实时推送探测结果
+- API 轮询获取探测结果
 
-### 实时功能
+### 管理功能
 
 - 配置预览 (JSON 编辑器)
-- 容器日志查看 (WebSocket 实时流)
+- 容器日志查看
 - 容器状态监控
 
 ---
@@ -148,7 +148,7 @@ ssh -L 7000:127.0.0.1:7000 user@your-server
 | Next.js 16 | Go 1.24 |
 | React 19 | Gin 1.11 |
 | Tailwind CSS | Docker SDK |
-| shadcn/ui | Gorilla WebSocket |
+| shadcn/ui | Docker SDK |
 
 ---
 
