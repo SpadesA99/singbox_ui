@@ -1,25 +1,25 @@
-# 构建阶段:在单个容器中完成前端和后端构建
-FROM golang:alpine AS builder
+# 前端构建阶段:平台无关，只需构建一次
+FROM --platform=$BUILDPLATFORM node:alpine AS frontend
 
-WORKDIR /app
-
-# 安装 Node.js 和必要的构建工具
-RUN apk add --no-cache nodejs npm git
-
-# 构建前端
-COPY frontend/ ./frontend/
 WORKDIR /app/frontend
+COPY frontend/ .
 RUN npm ci && npx next build
 
-# 构建后端
+# 后端构建阶段:根据目标平台交叉编译
+FROM --platform=$BUILDPLATFORM golang:alpine AS builder
+
+ARG TARGETARCH
 WORKDIR /app
+
+# 安装 git (go mod 需要)
+RUN apk add --no-cache git
+
 COPY server/ ./server/
-# 将前端构建产物复制到服务端 dist 目录
-RUN cp -r frontend/out server/dist
+COPY --from=frontend /app/frontend/out ./server/dist
 
 WORKDIR /app/server
 RUN go mod tidy && \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o sing-box-ui .
+    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o sing-box-ui .
 
 # 运行时阶段:只包含编译好的二进制文件
 FROM alpine:latest
