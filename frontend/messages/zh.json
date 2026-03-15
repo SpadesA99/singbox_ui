@@ -181,7 +181,11 @@
     "probeStartedDesc": "正在测速 {count} 个节点...",
     "probeCompleteDesc": "延迟结果已更新",
     "node": "节点",
-    "probe": "测速"
+    "probe": "测速",
+    "autoUpdate": "自动更新",
+    "autoUpdateInterval": "更新间隔",
+    "lastUpdated": "更新于 {time}",
+    "settingsUpdateFailed": "更新设置失败"
   },
   "inbound": {
     "title": "入站配置",

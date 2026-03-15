@@ -159,6 +159,35 @@ func GetUserAgents(c *gin.Context) {
 	})
 }
 
+// UpdateSubscriptionSettings 更新订阅自动更新设置
+func UpdateSubscriptionSettings(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid request", Message: "subscription id is required"})
+		return
+	}
+
+	var request struct {
+		AutoUpdate     bool `json:"auto_update"`
+		UpdateInterval int  `json:"update_interval"`
+	}
+	if err := c.BindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid request", Message: err.Error()})
+		return
+	}
+
+	entry, err := services.UpdateSubscriptionSettings(id, request.AutoUpdate, request.UpdateInterval)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to update settings", Message: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":      "Settings updated",
+		"subscription": entry,
+	})
+}
+
 // GetAllNodes 获取所有节点
 func GetAllNodes(c *gin.Context) {
 	nodes, err := services.GetAllNodes()

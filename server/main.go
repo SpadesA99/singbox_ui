@@ -83,8 +83,9 @@ func main() {
 		{
 			sub.GET("", handlers.GetSubscriptions)          // 获取所有订阅
 			sub.POST("", handlers.AddSubscription)          // 添加订阅
-			sub.POST("/:id/refresh", handlers.RefreshSubscription)  // 刷新单个订阅
-			sub.DELETE("/:id", handlers.DeleteSubscription) // 删除订阅
+			sub.POST("/:id/refresh", handlers.RefreshSubscription)         // 刷新单个订阅
+			sub.PATCH("/:id/settings", handlers.UpdateSubscriptionSettings) // 更新自动更新设置
+			sub.DELETE("/:id", handlers.DeleteSubscription)                 // 删除订阅
 			sub.POST("/refresh-all", handlers.RefreshAllSubscriptions) // 刷新所有订阅
 			sub.GET("/nodes", handlers.GetAllNodes)         // 获取所有节点
 			sub.GET("/user-agents", handlers.GetUserAgents) // 获取预定义 UA 列表

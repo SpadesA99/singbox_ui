@@ -181,7 +181,11 @@
     "probeStartedDesc": "Probing {count} nodes...",
     "probeCompleteDesc": "Latency results updated",
     "node": "Node",
-    "probe": "Probe"
+    "probe": "Probe",
+    "autoUpdate": "Auto Update",
+    "autoUpdateInterval": "Update Interval",
+    "lastUpdated": "Updated {time}",
+    "settingsUpdateFailed": "Failed to update settings"
   },
   "inbound": {
     "title": "Inbound Config",

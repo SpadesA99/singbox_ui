@@ -980,11 +980,14 @@ var PredefinedUserAgents = map[string]string{
 
 // SubscriptionEntry 单个订阅条目
 type SubscriptionEntry struct {
-	ID        string      `json:"id"`
-	Name      string      `json:"name"`
-	URL       string      `json:"url"`
-	UserAgent string      `json:"user_agent,omitempty"` // 请求时使用的 User-Agent
-	Nodes     []ProxyNode `json:"nodes"`
+	ID             string      `json:"id"`
+	Name           string      `json:"name"`
+	URL            string      `json:"url"`
+	UserAgent      string      `json:"user_agent,omitempty"`      // 请求时使用的 User-Agent
+	AutoUpdate     bool        `json:"auto_update,omitempty"`     // 是否自动更新
+	UpdateInterval int         `json:"update_interval,omitempty"` // 自动更新间隔（小时），0 表示禁用
+	LastUpdated    string      `json:"last_updated,omitempty"`    // 最后更新时间 (RFC3339)
+	Nodes          []ProxyNode `json:"nodes"`
 }
 
 // SubscriptionData 多订阅数据（兼容旧格式）
@@ -1095,11 +1098,12 @@ func AddSubscription(name, subURL, userAgent string) (*SubscriptionEntry, error)
 	}
 
 	entry := SubscriptionEntry{
-		ID:        generateSubscriptionID(),
-		Name:      name,
-		URL:       subURL,
-		UserAgent: userAgent,
-		Nodes:     nodes,
+		ID:          generateSubscriptionID(),
+		Name:        name,
+		URL:         subURL,
+		UserAgent:   userAgent,
+		LastUpdated: time.Now().Format(time.RFC3339),
+		Nodes:       nodes,
 	}
 
 	data.Subscriptions = append(data.Subscriptions, entry)
@@ -1126,11 +1130,33 @@ func UpdateSubscription(id string) (*SubscriptionEntry, error) {
 				return nil, fmt.Errorf("failed to fetch subscription: %w", err)
 			}
 			data.Subscriptions[i].Nodes = nodes
+			data.Subscriptions[i].LastUpdated = time.Now().Format(time.RFC3339)
 
 			if err := SaveSubscriptions(*data); err != nil {
 				return nil, err
 			}
 
+			return &data.Subscriptions[i], nil
+		}
+	}
+
+	return nil, fmt.Errorf("subscription not found: %s", id)
+}
+
+// UpdateSubscriptionSettings 更新订阅的自动更新设置
+func UpdateSubscriptionSettings(id string, autoUpdate bool, updateInterval int) (*SubscriptionEntry, error) {
+	data, err := LoadSubscriptions()
+	if err != nil {
+		return nil, err
+	}
+
+	for i, sub := range data.Subscriptions {
+		if sub.ID == id {
+			data.Subscriptions[i].AutoUpdate = autoUpdate
+			data.Subscriptions[i].UpdateInterval = updateInterval
+			if err := SaveSubscriptions(*data); err != nil {
+				return nil, err
+			}
 			return &data.Subscriptions[i], nil
 		}
 	}

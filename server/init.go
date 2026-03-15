@@ -103,6 +103,9 @@ func Initialize() error {
 		}
 	}
 
+	// 启动订阅自动更新调度器
+	services.StartAutoUpdateScheduler()
+
 	log.Println("sing-box Docker environment initialized successfully")
 	return nil
 }

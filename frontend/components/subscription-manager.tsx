@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Download, Loader2, RefreshCw, Trash2, Plus, ChevronDown, ChevronRight, Zap } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Download, Loader2, RefreshCw, Trash2, Plus, ChevronDown, ChevronRight, Zap, Clock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { apiClient } from "@/lib/api"
 import { useTranslation } from "@/lib/i18n"
@@ -43,6 +44,9 @@ interface SubscriptionEntry {
   name: string
   url: string
   user_agent?: string
+  auto_update?: boolean
+  update_interval?: number
+  last_updated?: string
   nodes: ProxyNode[]
 }
 
@@ -71,6 +75,21 @@ export function SubscriptionManager({ onNodeSelect, onNodesLoaded }: Subscriptio
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set())
   const [selectedNode, setSelectedNode] = useState<ProxyNode | null>(null)
   const [probing, setProbing] = useState(false)
+
+  const updateSettings = async (id: string, autoUpdate: boolean, updateInterval: number) => {
+    try {
+      const response = await fetch(`/api/subscription/${id}/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ auto_update: autoUpdate, update_interval: updateInterval }),
+      })
+      if (!response.ok) throw new Error(t("settingsUpdateFailed"))
+      const data = await response.json()
+      setSubscriptions(prev => prev.map(sub => sub.id === id ? data.subscription : sub))
+    } catch (error) {
+      toast({ title: t("settingsUpdateFailed"), description: String(error), variant: "destructive" })
+    }
+  }
 
   // 用 ref 追踪最新回调，避免 useEffect 依赖变化导致的问题
   const onNodesLoadedRef = useRef(onNodesLoaded)
@@ -497,8 +516,40 @@ export function SubscriptionManager({ onNodeSelect, onNodesLoaded }: Subscriptio
                   <span className="text-xs text-muted-foreground">
                     ({t("nodeCount", { count: sub.nodes?.length || 0 })})
                   </span>
+                  {sub.last_updated && (
+                    <span className="text-xs text-muted-foreground hidden sm:inline">
+                      {t("lastUpdated", { time: new Date(sub.last_updated).toLocaleString() })}
+                    </span>
+                  )}
                 </div>
-                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  {/* 自动更新设置 */}
+                  <div className="flex items-center gap-1.5 border rounded px-2 py-1">
+                    <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Checkbox
+                      checked={!!sub.auto_update}
+                      onCheckedChange={(checked) =>
+                        updateSettings(sub.id, !!checked, sub.update_interval || 24)
+                      }
+                    />
+                    {sub.auto_update && (
+                      <Select
+                        value={String(sub.update_interval || 24)}
+                        onValueChange={(v) => updateSettings(sub.id, true, Number(v))}
+                      >
+                        <SelectTrigger className="h-6 w-[70px] text-xs border-0 p-0 focus:ring-0">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1h</SelectItem>
+                          <SelectItem value="3">3h</SelectItem>
+                          <SelectItem value="6">6h</SelectItem>
+                          <SelectItem value="12">12h</SelectItem>
+                          <SelectItem value="24">24h</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
                   <Button
                     variant="ghost"
                     size="sm"
