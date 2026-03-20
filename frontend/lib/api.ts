@@ -126,10 +126,17 @@ class ApiClient {
   }
 
   // 保存配置到命名实例
-  async saveInstanceConfig(instanceName: string, config: any): Promise<{ message: string; name: string }> {
+  async saveInstanceConfig(instanceName: string, config: any): Promise<{ message: string; name: string; valid?: boolean; warning?: string }> {
     return this.request(`/api/singbox/instances/${encodeURIComponent(instanceName)}/config`, {
       method: 'POST',
       body: JSON.stringify(config),
+    });
+  }
+
+  // 验证命名实例的配置
+  async checkInstanceConfig(instanceName: string): Promise<{ valid: boolean; message: string }> {
+    return this.request(`/api/singbox/instances/${encodeURIComponent(instanceName)}/check`, {
+      method: 'POST',
     });
   }
 

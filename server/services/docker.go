@@ -316,6 +316,79 @@ func (d *DockerService) GetSingBoxVersion() (string, error) {
 	return strings.TrimSpace(output), nil
 }
 
+// CheckNamedConfig 使用临时容器验证命名配置是否正确
+func (d *DockerService) CheckNamedConfig(configName string, hostConfigDir string) (bool, string, error) {
+	// 获取宿主机上的实际配置目录
+	hostSingboxDir := os.Getenv("HOST_SINGBOX_DIR")
+	if hostSingboxDir == "" {
+		hostSingboxDir = filepath.Clean(hostConfigDir)
+	} else {
+		hostSingboxDir = filepath.Join(hostSingboxDir, "configs", configName)
+	}
+
+	resp, err := d.cli.ContainerCreate(d.ctx, &container.Config{
+		Image: SingBoxImageName,
+		Cmd:   []string{"check", "-C", ContainerConfigDir + "/"},
+	}, &container.HostConfig{
+		Mounts: []mount.Mount{
+			{
+				Type:     mount.TypeBind,
+				Source:   hostSingboxDir,
+				Target:   ContainerConfigDir,
+				ReadOnly: true,
+			},
+		},
+	}, nil, nil, "")
+	if err != nil {
+		return false, "", fmt.Errorf("failed to create check container: %w", err)
+	}
+	defer d.cli.ContainerRemove(d.ctx, resp.ID, types.ContainerRemoveOptions{Force: true})
+
+	if err := d.cli.ContainerStart(d.ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+		return false, "", fmt.Errorf("failed to start check container: %w", err)
+	}
+
+	// 等待容器退出
+	statusCh, errCh := d.cli.ContainerWait(d.ctx, resp.ID, container.WaitConditionNotRunning)
+	var exitCode int64
+	select {
+	case err := <-errCh:
+		if err != nil {
+			return false, "", fmt.Errorf("error waiting for check container: %w", err)
+		}
+		// errCh returned nil, still need to read status
+		status := <-statusCh
+		exitCode = status.StatusCode
+	case status := <-statusCh:
+		exitCode = status.StatusCode
+	case <-time.After(30 * time.Second):
+		return false, "", fmt.Errorf("timeout waiting for config check")
+	}
+
+	// 读取输出
+	logReader, err := d.cli.ContainerLogs(d.ctx, resp.ID, types.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+	})
+	if err != nil {
+		return false, "", fmt.Errorf("failed to read check logs: %w", err)
+	}
+	defer logReader.Close()
+
+	var stdout, stderr strings.Builder
+	_, _ = stdcopy.StdCopy(&stdout, &stderr, logReader)
+
+	output := strings.TrimSpace(stderr.String())
+	if output == "" {
+		output = strings.TrimSpace(stdout.String())
+	}
+
+	if exitCode != 0 {
+		return false, output, nil
+	}
+	return true, output, nil
+}
+
 // execInContainer 在运行中的容器内执行命令
 func (d *DockerService) execInContainer(cmd ...string) (string, error) {
 	execConfig := types.ExecConfig{

@@ -314,6 +314,24 @@ func ListAllContainers() ([]ContainerInfo, error) {
 	return ds.ListAllSingboxContainers()
 }
 
+// CheckNamedConfig 验证命名配置是否正确
+func CheckNamedConfig(name string) (bool, string, error) {
+	ds := GetDockerService()
+	if ds == nil {
+		return false, "", fmt.Errorf("docker service not initialized")
+	}
+
+	configDir := getNamedConfigDir(name)
+	configPath := filepath.Join(configDir, "config.json")
+
+	// 检查配置文件是否存在
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return false, "", fmt.Errorf("config file not found for instance: %s", name)
+	}
+
+	return ds.CheckNamedConfig(name, configDir)
+}
+
 // SaveNamedConfigWithDir 保存配置到命名目录（用于多容器场景）
 func SaveNamedConfigWithDir(name string, configData []byte) error {
 	configDir := getNamedConfigDir(name)

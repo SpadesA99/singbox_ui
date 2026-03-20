@@ -48,6 +48,8 @@ import {
   Square,
   Trash2,
   Pencil,
+  ShieldCheck,
+  Loader2,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { SubscriptionManager } from "@/components/subscription-manager"
@@ -96,6 +98,7 @@ export default function Home() {
   const [logsLoading, setLogsLoading] = useState(false)
   const [jsonEditMode, setJsonEditMode] = useState(false)
   const [editedJson, setEditedJson] = useState("")
+  const [validating, setValidating] = useState(false)
 
   // 获取计算后的完整配置
   const fullConfig = getFullConfig()
@@ -185,6 +188,42 @@ export default function Home() {
     }
   }
 
+  const handleValidateConfig = async () => {
+    if (!currentInstance) {
+      toast({
+        title: tc("error"),
+        description: t("selectOrCreate"),
+        variant: "destructive",
+      })
+      return
+    }
+
+    setValidating(true)
+    try {
+      const result = await apiClient.checkInstanceConfig(currentInstance)
+      if (result.valid) {
+        toast({
+          title: t("validateSuccess"),
+          description: t("validateSuccessDesc"),
+        })
+      } else {
+        toast({
+          title: t("validateFailed"),
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: t("validateError"),
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      })
+    } finally {
+      setValidating(false)
+    }
+  }
+
   const handleSaveConfig = async () => {
     if (!currentInstance) {
       toast({
@@ -197,10 +236,23 @@ export default function Home() {
 
     const result = await saveInstanceConfig()
     if (result.success) {
-      toast({
-        title: t("saveSuccess"),
-        description: t("saveSuccessDesc", { name: currentInstance }),
-      })
+      if (result.valid === false) {
+        toast({
+          title: t("saveValidateFailed"),
+          description: result.error,
+          variant: "destructive",
+        })
+      } else if (result.warning) {
+        toast({
+          title: t("saveValidateWarning"),
+          description: result.warning,
+        })
+      } else {
+        toast({
+          title: t("saveSuccess"),
+          description: t("saveSuccessDesc", { name: currentInstance! }),
+        })
+      }
     } else {
       toast({
         title: t("saveFailed"),
@@ -685,6 +737,19 @@ export default function Home() {
                           </>
                         ) : (
                           <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleValidateConfig}
+                              disabled={validating || !currentInstance}
+                            >
+                              {validating ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <ShieldCheck className="h-4 w-4" />
+                              )}
+                              <span className="ml-1">{validating ? t("validating") : t("validateConfig")}</span>
+                            </Button>
                             <Button
                               size="sm"
                               variant="outline"

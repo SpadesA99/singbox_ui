@@ -1121,6 +1121,8 @@ interface SaveResult {
   success: boolean
   path?: string
   error?: string
+  valid?: boolean
+  warning?: string
 }
 
 interface SingboxConfigStore {
@@ -1447,19 +1449,20 @@ export const useSingboxConfigStore = create<SingboxConfigStore>((set, get) => ({
         body: JSON.stringify(fullConfig, null, 2),
       })
 
+      const data = await response.json()
+
       if (response.ok) {
         set({
           isSaving: false,
           lastSavedAt: Date.now()
         })
-        return { success: true }
+        return { success: true, valid: data.valid, warning: data.warning, error: data.message }
       } else {
-        const errorData = await response.json()
         set({
           isSaving: false,
-          error: errorData.message
+          error: data.message
         })
-        return { success: false, error: errorData.message }
+        return { success: false, error: data.message }
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "保存配置失败"

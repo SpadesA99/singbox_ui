@@ -169,7 +169,29 @@ func ListNamedConfigs(c *gin.Context) {
 	})
 }
 
-// SaveNamedConfigWithContainer 保存配置到命名目录（用于多容器场景）
+// CheckNamedConfig 验证命名配置是否正确
+func CheckNamedConfig(c *gin.Context) {
+	name, ok := validateName(c)
+	if !ok {
+		return
+	}
+
+	valid, output, err := services.CheckNamedConfig(name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "Failed to check config",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"valid":   valid,
+		"message": output,
+	})
+}
+
+// SaveNamedConfigWithContainer 保存配置到命名目录并验证（用于多容器场景）
 func SaveNamedConfigWithContainer(c *gin.Context) {
 	name, ok := validateName(c)
 	if !ok {
@@ -185,6 +207,7 @@ func SaveNamedConfigWithContainer(c *gin.Context) {
 		return
 	}
 
+	// 先保存配置文件
 	if err := services.SaveNamedConfigWithDir(name, configData); err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "Failed to save config",
@@ -193,9 +216,32 @@ func SaveNamedConfigWithContainer(c *gin.Context) {
 		return
 	}
 
+	// 保存后验证配置
+	valid, output, err := services.CheckNamedConfig(name)
+	if err != nil {
+		// 验证失败不影响保存，但返回警告
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Config saved but validation unavailable",
+			"name":    name,
+			"valid":   nil,
+			"warning": err.Error(),
+		})
+		return
+	}
+
+	if !valid {
+		c.JSON(http.StatusOK, gin.H{
+			"message": output,
+			"name":    name,
+			"valid":   false,
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Config saved successfully",
+		"message": "Config saved and validated successfully",
 		"name":    name,
+		"valid":   true,
 	})
 }
 
