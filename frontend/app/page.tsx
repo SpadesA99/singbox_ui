@@ -59,6 +59,7 @@ import { useSingboxConfigStore } from "@/lib/store/singbox-config"
 import { apiClient } from "@/lib/api"
 import { useTranslation } from "@/lib/i18n"
 import { LanguageSwitcher } from "@/components/language-switcher"
+import AnsiToHtml from "ansi-to-html"
 
 export default function Home() {
   const { toast } = useToast()
@@ -100,6 +101,7 @@ export default function Home() {
   const [jsonEditMode, setJsonEditMode] = useState(false)
   const [editedJson, setEditedJson] = useState("")
   const [validating, setValidating] = useState(false)
+  const ansiConverter = useMemo(() => new AnsiToHtml({ fg: "#ccc", bg: "transparent", newline: true }), [])
 
   // 获取计算后的完整配置
   const fullConfig = getFullConfig()
@@ -935,9 +937,12 @@ export default function Home() {
                 <span className="ml-2 text-muted-foreground">{t("loadingLogs")}</span>
               </div>
             ) : (
-              <pre className="bg-muted p-4 rounded-lg text-sm overflow-auto max-h-[60vh] whitespace-pre-wrap font-mono">
-                {instanceLogs || t("noLogs")}
-              </pre>
+              <pre
+                className="bg-black text-green-400 p-4 rounded-lg text-sm overflow-auto max-h-[60vh] whitespace-pre-wrap font-mono"
+                dangerouslySetInnerHTML={{
+                  __html: instanceLogs ? ansiConverter.toHtml(instanceLogs) : t("noLogs")
+                }}
+              />
             )}
           </div>
           <DialogFooter>
