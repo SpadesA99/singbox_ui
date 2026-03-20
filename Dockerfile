@@ -1,5 +1,5 @@
 # 前端构建阶段:平台无关，只需构建一次
-FROM --platform=$BUILDPLATFORM node:alpine AS frontend
+FROM --platform=$BUILDPLATFORM node:20-slim AS frontend
 
 WORKDIR /app/frontend
 COPY frontend/ .
