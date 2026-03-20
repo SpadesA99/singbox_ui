@@ -150,7 +150,7 @@ export default function Home() {
       return
     }
 
-    if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+    if (!/^[a-zA-Z]{2,10}$/.test(name)) {
       toast({
         title: tc("error"),
         description: t("nameInvalid"),
@@ -846,7 +846,11 @@ export default function Home() {
                 id="instance-name"
                 placeholder={t("instanceNamePlaceholder")}
                 value={newInstanceName}
-                onChange={(e) => setNewInstanceName(e.target.value)}
+                maxLength={10}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^a-zA-Z]/g, "")
+                  setNewInstanceName(val)
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     handleCreateInstance()
