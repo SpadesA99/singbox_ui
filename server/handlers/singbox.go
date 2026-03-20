@@ -10,7 +10,7 @@ import (
 )
 
 // validNamePattern 合法的实例名称：字母、数字、下划线、连字符
-var validNamePattern = regexp.MustCompile(`^[a-zA-Z]{2,10}$`)
+var validNamePattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z_-]{1,9}$`)
 
 // validateName 校验实例名称：2-10位英文字母
 func validateName(c *gin.Context) (string, bool) {
@@ -18,7 +18,7 @@ func validateName(c *gin.Context) (string, bool) {
 	if name == "" || !validNamePattern.MatchString(name) {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "Invalid config name",
-			Message: "Name must be 2-10 letters only",
+			Message: "Name must be 2-10 chars, start with letter, allow letters, underscore, hyphen",
 		})
 		return "", false
 	}

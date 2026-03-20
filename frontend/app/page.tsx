@@ -153,7 +153,7 @@ export default function Home() {
       return
     }
 
-    if (!/^[a-zA-Z]{2,10}$/.test(name)) {
+    if (!/^[a-zA-Z][a-zA-Z_-]{1,9}$/.test(name)) {
       toast({
         title: tc("error"),
         description: t("nameInvalid"),
@@ -845,7 +845,7 @@ export default function Home() {
                 value={newInstanceName}
                 maxLength={10}
                 onChange={(e) => {
-                  const val = e.target.value.replace(/[^a-zA-Z]/g, "")
+                  const val = e.target.value.replace(/[^a-zA-Z_-]/g, "")
                   setNewInstanceName(val)
                 }}
                 onKeyDown={(e) => {
