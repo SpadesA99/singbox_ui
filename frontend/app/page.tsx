@@ -101,6 +101,9 @@ export default function Home() {
   const [jsonEditMode, setJsonEditMode] = useState(false)
   const [editedJson, setEditedJson] = useState("")
   const [validating, setValidating] = useState(false)
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false)
+  const [errorDialogTitle, setErrorDialogTitle] = useState("")
+  const [errorDialogMessage, setErrorDialogMessage] = useState("")
   const ansiConverter = useMemo(() => new AnsiToHtml({ fg: "#ccc", bg: "transparent", newline: true }), [])
 
   // 获取计算后的完整配置
@@ -210,18 +213,14 @@ export default function Home() {
           description: t("validateSuccessDesc"),
         })
       } else {
-        toast({
-          title: t("validateFailed"),
-          description: result.message,
-          variant: "destructive",
-        })
+        setErrorDialogTitle(t("validateFailed"))
+        setErrorDialogMessage(result.message)
+        setErrorDialogOpen(true)
       }
     } catch (error) {
-      toast({
-        title: t("validateError"),
-        description: error instanceof Error ? error.message : String(error),
-        variant: "destructive",
-      })
+      setErrorDialogTitle(t("validateError"))
+      setErrorDialogMessage(error instanceof Error ? error.message : String(error))
+      setErrorDialogOpen(true)
     } finally {
       setValidating(false)
     }
@@ -240,11 +239,9 @@ export default function Home() {
     const result = await saveInstanceConfig()
     if (result.success) {
       if (result.valid === false) {
-        toast({
-          title: t("saveValidateFailed"),
-          description: result.error,
-          variant: "destructive",
-        })
+        setErrorDialogTitle(t("saveValidateFailed"))
+        setErrorDialogMessage(result.error || "")
+        setErrorDialogOpen(true)
         return
       } else if (result.warning) {
         toast({
@@ -956,6 +953,33 @@ export default function Home() {
             <Button onClick={handleViewLogs} disabled={logsLoading}>
               <RotateCw className={`h-4 w-4 mr-2 ${logsLoading ? "animate-spin" : ""}`} />
               {tc("refresh")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Error Detail Dialog */}
+      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">{errorDialogTitle}</DialogTitle>
+          </DialogHeader>
+          <pre className="bg-black text-red-400 p-4 rounded-lg text-sm overflow-auto max-h-[40vh] whitespace-pre-wrap font-mono select-all">
+            {errorDialogMessage}
+          </pre>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                navigator.clipboard.writeText(errorDialogMessage)
+                toast({ title: t("copied"), description: t("copiedDesc") })
+              }}
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              {tc("copy")}
+            </Button>
+            <Button onClick={() => setErrorDialogOpen(false)}>
+              {tc("close")}
             </Button>
           </DialogFooter>
         </DialogContent>

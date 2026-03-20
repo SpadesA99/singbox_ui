@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -383,10 +384,19 @@ func (d *DockerService) CheckNamedConfig(configName string, hostConfigDir string
 		output = strings.TrimSpace(stdout.String())
 	}
 
+	// 去除 ANSI 转义码
+	output = stripAnsi(output)
+
 	if exitCode != 0 {
 		return false, output, nil
 	}
 	return true, output, nil
+}
+
+// stripAnsi 去除字符串中的 ANSI 转义序列
+func stripAnsi(s string) string {
+	re := regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	return re.ReplaceAllString(s, "")
 }
 
 // execInContainer 在运行中的容器内执行命令
