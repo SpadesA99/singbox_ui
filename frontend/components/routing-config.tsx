@@ -330,9 +330,9 @@ export function RoutingConfig({ showCard = true, availableOutbounds = EMPTY_OUTB
         <Label>{t("routeMode")}</Label>
         <div className="grid grid-cols-3 gap-2">
           {[
-            { value: "rules" as const, label: t("ruleRouting") },
             { value: "global_proxy" as const, label: t("globalProxy") },
             { value: "global_direct" as const, label: t("globalDirect") },
+            { value: "rules" as const, label: t("ruleRouting") },
           ].map((mode) => (
             <Button
               key={mode.value}
