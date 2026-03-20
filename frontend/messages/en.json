@@ -84,7 +84,7 @@
     "justSaved": "Just saved",
     "minutesAgo": "{n} min ago",
     "hoursAgo": "{n} hr ago",
-    "saveConfig": "Save Config",
+    "saveConfig": "Run Container",
     "viewLogs": "View Logs",
     "tabs": {
       "subscription": "Subscription",

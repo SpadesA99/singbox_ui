@@ -84,7 +84,7 @@
     "justSaved": "刚刚保存",
     "minutesAgo": "{n} 分钟前保存",
     "hoursAgo": "{n} 小时前保存",
-    "saveConfig": "保存配置",
+    "saveConfig": "运行容器",
     "viewLogs": "查看日志",
     "tabs": {
       "subscription": "订阅",
