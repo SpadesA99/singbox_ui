@@ -243,6 +243,7 @@ export default function Home() {
           description: result.error,
           variant: "destructive",
         })
+        return
       } else if (result.warning) {
         toast({
           title: t("saveValidateWarning"),
@@ -252,6 +253,21 @@ export default function Home() {
         toast({
           title: t("saveSuccess"),
           description: t("saveSuccessDesc", { name: currentInstance! }),
+        })
+      }
+      // 保存成功后自动运行容器
+      try {
+        await apiClient.runInstance(currentInstance!)
+        toast({
+          title: t("startSuccess"),
+          description: t("startSuccessDesc", { name: currentInstance! }),
+        })
+        loadInstances()
+      } catch (error) {
+        toast({
+          title: t("startFailed"),
+          description: error instanceof Error ? error.message : String(error),
+          variant: "destructive",
         })
       }
     } else {
