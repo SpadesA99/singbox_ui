@@ -50,6 +50,7 @@ import {
   Pencil,
   ShieldCheck,
   Loader2,
+  Github,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { SubscriptionManager } from "@/components/subscription-manager"
@@ -392,6 +393,14 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-3">
+              <a
+                href="https://github.com/SpadesA99/singbox_ui"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex h-9 w-9 items-center justify-center rounded-md border border-border hover:bg-accent transition-colors"
+              >
+                <Github className="h-5 w-5" />
+              </a>
               <LanguageSwitcher />
               {/* Version Indicator */}
               <div className="flex items-center gap-2 rounded-full border border-border bg-muted px-4 py-2">
