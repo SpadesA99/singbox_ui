@@ -235,6 +235,8 @@ type ClashProxy struct {
 	Flow string `yaml:"flow"`
 	// Reality
 	RealityOpts *ClashRealityOptions `yaml:"reality-opts"`
+	// Servername (Clash Meta 格式，用于 Reality SNI)
+	Servername string `yaml:"servername"`
 	// Client Fingerprint
 	ClientFingerprint string `yaml:"client-fingerprint"`
 	// SS plugin
@@ -508,8 +510,12 @@ func addClashTLS(proxy ClashProxy, outbound map[string]interface{}) {
 	tlsConfig := map[string]interface{}{
 		"enabled": true,
 	}
-	if proxy.SNI != "" {
-		tlsConfig["server_name"] = proxy.SNI
+	sni := proxy.SNI
+	if sni == "" {
+		sni = proxy.Servername
+	}
+	if sni != "" {
+		tlsConfig["server_name"] = sni
 	}
 	if proxy.SkipCertVerify {
 		tlsConfig["insecure"] = true

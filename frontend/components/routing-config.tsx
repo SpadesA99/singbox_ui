@@ -44,7 +44,7 @@ export function RoutingConfig({ showCard = true, availableOutbounds = EMPTY_OUTB
   const [rules, setRules] = useState<RouteRule[]>([])
   const [defaultDomainResolver, setDefaultDomainResolver] = useState("local_dns")
   const [activeTab, setActiveTab] = useState("direct")
-  const [routeMode, setRouteMode] = useState<"rules" | "global_proxy" | "global_direct">("rules")
+  const [routeMode, setRouteMode] = useState<"rules" | "global_proxy" | "global_direct">("global_proxy")
 
   // Passwall 风格列表状态
   const [directDomains, setDirectDomains] = useState("")
