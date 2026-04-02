@@ -766,19 +766,6 @@ export default function Home() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={handleValidateConfig}
-                              disabled={validating || !currentInstance}
-                            >
-                              {validating ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <ShieldCheck className="h-4 w-4" />
-                              )}
-                              <span className="ml-1">{validating ? t("validating") : t("validateConfig")}</span>
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
                               onClick={() => {
                                 setEditedJson(JSON.stringify(fullConfig, null, 2))
                                 setJsonEditMode(true)
