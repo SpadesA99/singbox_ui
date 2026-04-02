@@ -21,11 +21,11 @@ import (
 
 // Docker 容器配置常量
 const (
-	SingBoxContainerName = "sing-box"
+	SingBoxContainerName   = "sing-box"
 	SingBoxContainerPrefix = "sing-box-" // 用于多配置容器命名
-	SingBoxImageName     = "ghcr.io/sagernet/sing-box:1.13.5"
-	ContainerConfigDir   = "/etc/sing-box"
-	ContainerDataDir     = "/var/lib/sing-box"
+	SingBoxImageName       = "ghcr.io/sagernet/sing-box:v1.13.5"
+	ContainerConfigDir     = "/etc/sing-box"
+	ContainerDataDir       = "/var/lib/sing-box"
 	// 宿主机数据目录（通过环境变量配置，默认为 /root/singbox_data）
 	DefaultHostDataDir = "/root/singbox_data"
 )
@@ -431,7 +431,6 @@ func (d *DockerService) execInContainer(cmd ...string) (string, error) {
 
 	return output, nil
 }
-
 
 // GetNamedContainerName 获取命名配置的容器名称
 func GetNamedContainerName(configName string) string {
