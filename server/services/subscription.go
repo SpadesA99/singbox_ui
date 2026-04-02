@@ -1013,7 +1013,7 @@ func getSubscriptionFilePath() string {
 		// 默认使用当前工作目录
 		baseDir, _ = os.Getwd()
 	}
-	return filepath.Join(baseDir, "data", "subscription.json")
+	return filepath.Join(baseDir, "subscription.json")
 }
 
 // SaveSubscriptions 保存多订阅数据到文件

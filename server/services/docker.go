@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -28,8 +29,12 @@ const (
 	SingBoxImageTarPath    = "/root/singbox-image.tar" // CI 预拉取的镜像 tar 文件路径
 	ContainerConfigDir     = "/etc/sing-box"
 	ContainerDataDir       = "/var/lib/sing-box"
-	// 宿主机数据目录（通过环境变量配置，默认为 /root/singbox_data）
-	DefaultHostDataDir = "/root/singbox_data"
+)
+
+// hostDataDir 缓存自动探测的宿主机数据目录路径（通过 sync.Once 保证线程安全）
+var (
+	hostDataDir     string
+	hostDataDirOnce sync.Once
 )
 
 // DockerService Docker 服务封装
@@ -57,6 +62,64 @@ func (d *DockerService) Close() error {
 		return d.cli.Close()
 	}
 	return nil
+}
+
+// detectHostDataDir 自动探测宿主机上 DATA_DIR 对应的挂载路径
+// 通过 Docker API 检查自身容器的挂载信息，找到容器内 DATA_DIR 对应的宿主机路径
+// 使用 sync.Once 保证线程安全且只执行一次
+func (d *DockerService) detectHostDataDir() string {
+	hostDataDirOnce.Do(func() {
+		containerDataDir := os.Getenv("DATA_DIR")
+		if containerDataDir == "" {
+			containerDataDir = "/home/data"
+		}
+
+		// 通过 hostname 获取自身容器 ID
+		hostname, err := os.Hostname()
+		if err != nil {
+			log.Printf("ERROR: cannot get hostname for mount detection: %v", err)
+			return
+		}
+
+		// 通过 Docker API 检查自身容器挂载
+		containerInfo, err := d.cli.ContainerInspect(d.ctx, hostname)
+		if err != nil {
+			log.Printf("ERROR: cannot inspect self container %s: %v", hostname, err)
+			return
+		}
+
+		for _, m := range containerInfo.Mounts {
+			if m.Destination == containerDataDir {
+				hostDataDir = m.Source
+				log.Printf("Auto-detected host data dir: %s -> %s", containerDataDir, hostDataDir)
+				return
+			}
+		}
+
+		log.Printf("ERROR: no mount found for %s, sing-box container creation will fail", containerDataDir)
+	})
+	return hostDataDir
+}
+
+// resolveHostConfigDir 将容器内路径解析为宿主机路径
+// 用于 Docker-in-Docker 场景下创建 sing-box 容器时的卷挂载
+func (d *DockerService) resolveHostConfigDir(containerPath string) (string, error) {
+	hostDir := d.detectHostDataDir()
+	if hostDir == "" {
+		return "", fmt.Errorf("cannot resolve host path: host data directory not detected, ensure the container has a volume mount for DATA_DIR")
+	}
+
+	containerDataDir := os.Getenv("DATA_DIR")
+	if containerDataDir == "" {
+		containerDataDir = "/home/data"
+	}
+
+	// 将容器内路径 /home/data/xxx 替换为 宿主机路径/xxx
+	rel, err := filepath.Rel(containerDataDir, containerPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return "", fmt.Errorf("path %s is not under DATA_DIR %s", containerPath, containerDataDir)
+	}
+	return filepath.Join(hostDir, rel), nil
 }
 
 // EnsureImage 确保镜像存在：优先从内嵌 tar 加载，否则从远程拉取
@@ -163,24 +226,18 @@ func (d *DockerService) CreateAndStartContainer(hostConfigDir string) (string, e
 	// 先尝试删除可能存在的同名容器
 	_ = d.RemoveContainer()
 
-	// 获取宿主机上的实际配置目录
-	// 如果设置了 HOST_SINGBOX_DIR 环境变量（用于 Docker-in-Docker 场景），使用它
-	hostSingboxDir := os.Getenv("HOST_SINGBOX_DIR")
-	if hostSingboxDir == "" {
-		// 默认使用传入的路径，清理路径防止穿越
-		hostSingboxDir = filepath.Clean(hostConfigDir)
+	// 将容器内路径解析为宿主机路径（Docker-in-Docker 场景）
+	hostSingboxDir, err := d.resolveHostConfigDir(hostConfigDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve host config dir: %w", err)
 	}
-
 	log.Printf("Mounting host directory %s to container /etc/sing-box", hostSingboxDir)
 
-	// 确保 ACME 数据目录存在（使用容器内部路径创建目录）
-	// hostConfigDir 是 singbox-ui 容器内的路径
-	// hostSingboxDir 是宿主机路径，用于 Docker API 挂载配置
+	// 确保 ACME 数据目录存在（使用容器内部路径）
 	internalAcmeDir := filepath.Join(hostConfigDir, "acme")
 	if err := os.MkdirAll(internalAcmeDir, 0755); err != nil {
 		log.Printf("Warning: failed to create ACME directory %s: %v", internalAcmeDir, err)
 	}
-	// 宿主机上对应的 ACME 目录路径（用于 Docker mount）
 	hostAcmeDir := hostSingboxDir + "/acme"
 
 	// 容器配置
@@ -385,12 +442,9 @@ func (d *DockerService) GetSingBoxVersion() (string, error) {
 
 // CheckNamedConfig 使用临时容器验证命名配置是否正确
 func (d *DockerService) CheckNamedConfig(configName string, hostConfigDir string) (bool, string, error) {
-	// 获取宿主机上的实际配置目录
-	hostSingboxDir := os.Getenv("HOST_SINGBOX_DIR")
-	if hostSingboxDir == "" {
-		hostSingboxDir = filepath.Clean(hostConfigDir)
-	} else {
-		hostSingboxDir = filepath.Join(hostSingboxDir, "configs", configName)
+	hostSingboxDir, err := d.resolveHostConfigDir(hostConfigDir)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to resolve host config dir: %w", err)
 	}
 
 	resp, err := d.cli.ContainerCreate(d.ctx, &container.Config{
@@ -510,25 +564,17 @@ func (d *DockerService) CreateAndStartNamedContainer(configName string, hostConf
 	// 先尝试删除可能存在的同名容器
 	_ = d.RemoveNamedContainer(configName)
 
-	// 获取宿主机上的实际配置目录
-	hostSingboxDir := os.Getenv("HOST_SINGBOX_DIR")
-	if hostSingboxDir == "" {
-		hostSingboxDir = filepath.Clean(hostConfigDir)
-	} else {
-		// 如果设置了 HOST_SINGBOX_DIR，需要添加配置名称路径
-		hostSingboxDir = filepath.Join(hostSingboxDir, "configs", configName)
+	hostSingboxDir, err := d.resolveHostConfigDir(hostConfigDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve host config dir: %w", err)
 	}
-
 	log.Printf("Creating named container %s, mounting %s to /etc/sing-box", containerName, hostSingboxDir)
 
-	// 确保 ACME 数据目录存在（使用容器内部路径创建目录）
-	// hostConfigDir 是 singbox-ui 容器内的路径（如 /home/data/singbox/configs/vless）
-	// hostSingboxDir 是宿主机路径，用于 Docker API 挂载配置
+	// 确保 ACME 数据目录存在（使用容器内部路径）
 	internalAcmeDir := filepath.Join(hostConfigDir, "acme")
 	if err := os.MkdirAll(internalAcmeDir, 0755); err != nil {
 		log.Printf("Warning: failed to create ACME directory %s: %v", internalAcmeDir, err)
 	}
-	// 宿主机上对应的 ACME 目录路径（用于 Docker mount）
 	hostAcmeDir := hostSingboxDir + "/acme"
 
 	// 容器配置
