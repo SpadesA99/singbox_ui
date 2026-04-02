@@ -1828,10 +1828,15 @@ PersistentKeepalive = 25`
                             try {
                               const response = await apiClient.generateRealityKeypair()
                               if (response.private_key) {
+                                // 自动生成 Short ID（8 字节 = 16 位十六进制）
+                                const shortIdBytes = new Uint8Array(8)
+                                crypto.getRandomValues(shortIdBytes)
+                                const shortId = Array.from(shortIdBytes).map(b => b.toString(16).padStart(2, '0')).join('')
                                 setVlessConfig((prev) => ({
                                   ...prev,
                                   reality_private_key: response.private_key,
                                   reality_public_key: response.public_key || "",
+                                  reality_short_id: prev.reality_short_id || shortId,
                                 }))
                                 if (response.public_key) {
                                   try {
