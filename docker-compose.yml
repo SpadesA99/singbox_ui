@@ -9,6 +9,6 @@ services:
       - ./data:/home/data
     environment:
       - DATA_DIR=/home/data
-      # 默认仅本机访问，如需外部访问可改为 0.0.0.0:7000
+      - HOST_DATA_DIR=${PWD}/data
       - LISTEN_ADDR=127.0.0.1:7000
       - TZ=Asia/Shanghai

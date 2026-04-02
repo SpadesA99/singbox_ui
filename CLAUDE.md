@@ -56,7 +56,7 @@ docker-compose up -d   # Production deployment
 
 ### Docker-in-Docker Pattern
 The UI container manages sing-box via Docker socket:
-- Host mount path auto-detected via Docker API (inspects own container mounts)
+- `HOST_DATA_DIR` env var provides host data path for sing-box container volume mounts
 - UI container creates/manages `ghcr.io/sagernet/sing-box` container
 - Config files stored in data directory, mounted into sing-box container
 - Container command: `-D /var/lib/sing-box -C /etc/sing-box/ run`
@@ -82,7 +82,7 @@ All API endpoints prefixed with `/api/`:
 | Variable | Purpose |
 |----------|---------|
 | `DATA_DIR` | Container internal data directory (default: `/home/data`) |
-| `HOST_SINGBOX_DIR` | Host path for sing-box config (required for Docker-in-Docker) |
+| `HOST_DATA_DIR` | Host data directory for sing-box container mounts (default: `${PWD}/data`) |
 | `LISTEN_ADDR` | Server listen address (default: `127.0.0.1:7000`) |
 | `TZ` | Timezone (default: `Asia/Shanghai`) |
 

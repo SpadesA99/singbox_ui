@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -31,11 +30,6 @@ const (
 	ContainerDataDir       = "/var/lib/sing-box"
 )
 
-// hostDataDir 缓存自动探测的宿主机数据目录路径（通过 sync.Once 保证线程安全）
-var (
-	hostDataDir     string
-	hostDataDirOnce sync.Once
-)
 
 // DockerService Docker 服务封装
 type DockerService struct {
@@ -64,52 +58,17 @@ func (d *DockerService) Close() error {
 	return nil
 }
 
-// detectHostDataDir 自动探测宿主机上 DATA_DIR 对应的挂载路径
-// 遍历所有运行中的容器，找到挂载了 DATA_DIR 的容器（即自身），读取宿主机路径
-// 使用 sync.Once 保证线程安全且只执行一次
-func (d *DockerService) detectHostDataDir() string {
-	hostDataDirOnce.Do(func() {
-		containerDataDir := os.Getenv("DATA_DIR")
-		if containerDataDir == "" {
-			containerDataDir = "/home/data"
-		}
-
-		// 遍历所有容器，通过 DATA_DIR 挂载点匹配找到自身
-		// 这种方式不依赖容器 ID 检测，兼容所有网络模式和 cgroup 版本
-		containers, err := d.cli.ContainerList(d.ctx, types.ContainerListOptions{All: true})
-		if err != nil {
-			log.Printf("ERROR: cannot list containers for mount detection: %v", err)
-			return
-		}
-
-		for _, c := range containers {
-			info, err := d.cli.ContainerInspect(d.ctx, c.ID)
-			if err != nil {
-				continue
-			}
-			for _, m := range info.Mounts {
-				if m.Destination == containerDataDir {
-					// 验证这个挂载在容器内部确实可访问（确认是自身容器）
-					if _, err := os.Stat(containerDataDir); err == nil {
-						hostDataDir = m.Source
-						log.Printf("Auto-detected host data dir: %s -> %s (container: %s)", containerDataDir, hostDataDir, c.ID[:12])
-						return
-					}
-				}
-			}
-		}
-
-		log.Printf("ERROR: no container found with mount for %s, sing-box container creation will fail", containerDataDir)
-	})
-	return hostDataDir
+// getHostDataDir 获取宿主机数据目录路径（通过 HOST_DATA_DIR 环境变量）
+func getHostDataDir() string {
+	return os.Getenv("HOST_DATA_DIR")
 }
 
 // resolveHostConfigDir 将容器内路径解析为宿主机路径
 // 用于 Docker-in-Docker 场景下创建 sing-box 容器时的卷挂载
-func (d *DockerService) resolveHostConfigDir(containerPath string) (string, error) {
-	hostDir := d.detectHostDataDir()
+func resolveHostConfigDir(containerPath string) (string, error) {
+	hostDir := getHostDataDir()
 	if hostDir == "" {
-		return "", fmt.Errorf("cannot resolve host path: host data directory not detected, ensure the container has a volume mount for DATA_DIR")
+		return "", fmt.Errorf("HOST_DATA_DIR environment variable is not set")
 	}
 
 	containerDataDir := os.Getenv("DATA_DIR")
@@ -230,7 +189,7 @@ func (d *DockerService) CreateAndStartContainer(hostConfigDir string) (string, e
 	_ = d.RemoveContainer()
 
 	// 将容器内路径解析为宿主机路径（Docker-in-Docker 场景）
-	hostSingboxDir, err := d.resolveHostConfigDir(hostConfigDir)
+	hostSingboxDir, err := resolveHostConfigDir(hostConfigDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve host config dir: %w", err)
 	}
@@ -445,7 +404,7 @@ func (d *DockerService) GetSingBoxVersion() (string, error) {
 
 // CheckNamedConfig 使用临时容器验证命名配置是否正确
 func (d *DockerService) CheckNamedConfig(configName string, hostConfigDir string) (bool, string, error) {
-	hostSingboxDir, err := d.resolveHostConfigDir(hostConfigDir)
+	hostSingboxDir, err := resolveHostConfigDir(hostConfigDir)
 	if err != nil {
 		return false, "", fmt.Errorf("failed to resolve host config dir: %w", err)
 	}
@@ -567,7 +526,7 @@ func (d *DockerService) CreateAndStartNamedContainer(configName string, hostConf
 	// 先尝试删除可能存在的同名容器
 	_ = d.RemoveNamedContainer(configName)
 
-	hostSingboxDir, err := d.resolveHostConfigDir(hostConfigDir)
+	hostSingboxDir, err := resolveHostConfigDir(hostConfigDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve host config dir: %w", err)
 	}

@@ -101,6 +101,7 @@ services:
       - ./data:/home/data
     environment:
       - DATA_DIR=/home/data
+      - HOST_DATA_DIR=${PWD}/data
       - LISTEN_ADDR=127.0.0.1:7000
       - TZ=Asia/Shanghai
 ```
@@ -115,7 +116,7 @@ docker compose up -d
 > - 使用 `network_mode: host` 以便容器直接使用宿主机网络
 > - 默认监听 `127.0.0.1:7000`，仅本地访问，可通过 `LISTEN_ADDR` 环境变量自定义
 > - 挂载 Docker Socket 用于管理 sing-box 容器
-> - 宿主机挂载路径自动探测，无需手动配置
+> - `HOST_DATA_DIR` 通过 `${PWD}` 自动映射宿主机数据目录，用于 sing-box 容器挂载
 > - 内置 sing-box v1.13.5 镜像，首次启动自动加载，无需联网拉取
 
 ### 远程访问
@@ -137,6 +138,7 @@ ssh -L 7000:127.0.0.1:7000 user@your-server
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `DATA_DIR` | 容器内数据目录 | `/home/data` |
+| `HOST_DATA_DIR` | 宿主机数据目录（用于 sing-box 容器挂载） | `${PWD}/data` |
 | `LISTEN_ADDR` | 服务监听地址 | `127.0.0.1:7000` |
 | `TZ` | 时区 | `Asia/Shanghai` |
 

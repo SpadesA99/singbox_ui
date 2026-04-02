@@ -101,6 +101,7 @@ services:
       - ./data:/home/data
     environment:
       - DATA_DIR=/home/data
+      - HOST_DATA_DIR=${PWD}/data
       - LISTEN_ADDR=127.0.0.1:7000
       - TZ=Asia/Shanghai
 ```
@@ -115,7 +116,7 @@ Visit http://127.0.0.1:7000
 > - Uses `network_mode: host` for direct host network access
 > - Listens on `127.0.0.1:7000` by default (local only), customizable via `LISTEN_ADDR`
 > - Mounts Docker Socket to manage the sing-box container
-> - Host mount path is auto-detected, no manual configuration needed
+> - `HOST_DATA_DIR` maps host data directory via `${PWD}` for sing-box container volume mounts
 > - Bundled sing-box v1.13.5 image, auto-loaded on first start without network access
 
 ### Remote Access
@@ -137,6 +138,7 @@ Then visit http://127.0.0.1:7000 in your local browser.
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DATA_DIR` | Data directory inside container | `/home/data` |
+| `HOST_DATA_DIR` | Host data directory (for sing-box container mounts) | `${PWD}/data` |
 | `LISTEN_ADDR` | Server listen address | `127.0.0.1:7000` |
 | `TZ` | Timezone | `Asia/Shanghai` |
 
