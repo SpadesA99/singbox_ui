@@ -64,58 +64,8 @@ func (d *DockerService) Close() error {
 	return nil
 }
 
-// getSelfContainerID 获取自身容器 ID
-// 优先使用 hostname（默认 Docker 行为），若 hostname 不是容器 ID（如 network_mode: host），
-// 则从 /proc/1/cpuset 或 /proc/self/cgroup 中解析
-func getSelfContainerID() (string, error) {
-	// 方法 1: hostname（非 host 网络模式时，Docker 默认设置 hostname 为容器短 ID）
-	if hostname, err := os.Hostname(); err == nil && isHexString(hostname) && len(hostname) >= 12 {
-		return hostname, nil
-	}
-
-	// 方法 2: /proc/1/cpuset（cgroup v1 常见格式 /docker/<id>）
-	if data, err := os.ReadFile("/proc/1/cpuset"); err == nil {
-		if id := extractContainerIDFromPath(strings.TrimSpace(string(data))); id != "" {
-			return id, nil
-		}
-	}
-
-	// 方法 3: /proc/self/cgroup
-	// cgroup v1: "N:name:/docker/<id>"
-	// cgroup v2: "0::/docker/<id>" 或 "0::/system.slice/docker-<id>.scope"
-	if data, err := os.ReadFile("/proc/self/cgroup"); err == nil {
-		for _, line := range strings.Split(string(data), "\n") {
-			if id := extractContainerIDFromPath(line); id != "" {
-				return id, nil
-			}
-		}
-	}
-
-	return "", fmt.Errorf("cannot determine own container ID (hostname is not a container ID and /proc parsing failed)")
-}
-
-// isHexString 检查字符串是否全为十六进制字符
-func isHexString(s string) bool {
-	for _, c := range s {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
-			return false
-		}
-	}
-	return len(s) > 0
-}
-
-// extractContainerIDFromPath 从 cgroup 路径中提取 64 位十六进制容器 ID
-func extractContainerIDFromPath(path string) string {
-	// 匹配 /docker/<id>, /docker-<id>.scope, /containerd/<id> 等格式
-	re := regexp.MustCompile(`([0-9a-f]{64})`)
-	if match := re.FindString(path); match != "" {
-		return match
-	}
-	return ""
-}
-
 // detectHostDataDir 自动探测宿主机上 DATA_DIR 对应的挂载路径
-// 通过 Docker API 检查自身容器的挂载信息，找到容器内 DATA_DIR 对应的宿主机路径
+// 遍历所有运行中的容器，找到挂载了 DATA_DIR 的容器（即自身），读取宿主机路径
 // 使用 sync.Once 保证线程安全且只执行一次
 func (d *DockerService) detectHostDataDir() string {
 	hostDataDirOnce.Do(func() {
@@ -124,28 +74,32 @@ func (d *DockerService) detectHostDataDir() string {
 			containerDataDir = "/home/data"
 		}
 
-		containerID, err := getSelfContainerID()
+		// 遍历所有容器，通过 DATA_DIR 挂载点匹配找到自身
+		// 这种方式不依赖容器 ID 检测，兼容所有网络模式和 cgroup 版本
+		containers, err := d.cli.ContainerList(d.ctx, types.ContainerListOptions{All: true})
 		if err != nil {
-			log.Printf("ERROR: %v", err)
+			log.Printf("ERROR: cannot list containers for mount detection: %v", err)
 			return
 		}
 
-		// 通过 Docker API 检查自身容器挂载
-		containerInfo, err := d.cli.ContainerInspect(d.ctx, containerID)
-		if err != nil {
-			log.Printf("ERROR: cannot inspect self container %s: %v", containerID[:12], err)
-			return
-		}
-
-		for _, m := range containerInfo.Mounts {
-			if m.Destination == containerDataDir {
-				hostDataDir = m.Source
-				log.Printf("Auto-detected host data dir: %s -> %s", containerDataDir, hostDataDir)
-				return
+		for _, c := range containers {
+			info, err := d.cli.ContainerInspect(d.ctx, c.ID)
+			if err != nil {
+				continue
+			}
+			for _, m := range info.Mounts {
+				if m.Destination == containerDataDir {
+					// 验证这个挂载在容器内部确实可访问（确认是自身容器）
+					if _, err := os.Stat(containerDataDir); err == nil {
+						hostDataDir = m.Source
+						log.Printf("Auto-detected host data dir: %s -> %s (container: %s)", containerDataDir, hostDataDir, c.ID[:12])
+						return
+					}
+				}
 			}
 		}
 
-		log.Printf("ERROR: no mount found for %s, sing-box container creation will fail", containerDataDir)
+		log.Printf("ERROR: no container found with mount for %s, sing-box container creation will fail", containerDataDir)
 	})
 	return hostDataDir
 }
