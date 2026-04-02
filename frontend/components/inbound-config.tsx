@@ -320,12 +320,20 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
           reality_handshake_server: initialConfig.tls?.reality?.handshake?.server || "",
           reality_handshake_port: initialConfig.tls?.reality?.handshake?.server_port || 443,
           reality_private_key: initialConfig.tls?.reality?.private_key || "",
-          reality_public_key: "",
+          reality_public_key: "", // 将在下方异步派生
           reality_short_id: initialConfig.tls?.reality?.short_id?.[0] || "",
           transport_type: initialConfig.transport?.type || "tcp",
           transport_path: initialConfig.transport?.path || "",
           transport_service_name: initialConfig.transport?.service_name || "",
         })
+        // 异步从私钥派生公钥
+        if (initialConfig.tls?.reality?.private_key) {
+          apiClient.deriveRealityPublicKey(initialConfig.tls.reality.private_key)
+            .then(res => {
+              setVlessConfig(prev => ({ ...prev, reality_public_key: res.public_key }))
+            })
+            .catch(() => console.warn("Failed to derive Reality public key from private key"))
+        }
         break
 
       case "wireguard":

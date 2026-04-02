@@ -241,6 +241,55 @@ func UploadCertificate(c *gin.Context) {
 	})
 }
 
+// DeriveRealityPublicKey 从 Reality 私钥派生公钥
+func DeriveRealityPublicKey(c *gin.Context) {
+	var req struct {
+		PrivateKey string `json:"private_key" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Bad Request",
+			"message": "private_key is required",
+		})
+		return
+	}
+
+	privateKeyBytes, err := base64.RawURLEncoding.DecodeString(req.PrivateKey)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Bad Request",
+			"message": "Invalid private key encoding",
+		})
+		return
+	}
+
+	if len(privateKeyBytes) != 32 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Bad Request",
+			"message": "Invalid private key length",
+		})
+		return
+	}
+
+	// Clamp private key for x25519 (与 GenerateRealityKeypair 保持一致)
+	privateKeyBytes[0] &= 248
+	privateKeyBytes[31] &= 127
+	privateKeyBytes[31] |= 64
+
+	publicKey, err := curve25519.X25519(privateKeyBytes, curve25519.Basepoint)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Internal Server Error",
+			"message": "Failed to derive public key: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"public_key": base64.RawURLEncoding.EncodeToString(publicKey),
+	})
+}
+
 // GenerateRealityKeypair 生成 Reality x25519 密钥对
 func GenerateRealityKeypair(c *gin.Context) {
 	// 生成随机私钥

@@ -95,6 +95,14 @@ class ApiClient {
     });
   }
 
+  // 从 Reality 私钥派生公钥
+  async deriveRealityPublicKey(privateKey: string): Promise<{ public_key: string }> {
+    return this.request('/api/singbox/reality/public-key', {
+      method: 'POST',
+      body: JSON.stringify({ private_key: privateKey }),
+    });
+  }
+
   // 获取证书信息
   async getCertificateInfo(instance: string): Promise<CertificateInfo & { exists: boolean }> {
     return this.request(`/api/singbox/certificate?instance=${encodeURIComponent(instance)}`, {
