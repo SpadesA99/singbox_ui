@@ -1709,7 +1709,7 @@ export const useSingboxConfigStore = create<SingboxConfigStore>((set, get) => ({
               !/^[\d.:]+$/.test(server.server) &&
               !server.domain_resolver
             ) {
-              return { ...server, domain_resolver: ipResolver.tag }
+              return { ...server, domain_resolver: { server: ipResolver.tag } }
             }
             return server
           }),

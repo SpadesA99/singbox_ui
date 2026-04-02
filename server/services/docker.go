@@ -23,7 +23,7 @@ import (
 const (
 	SingBoxContainerName = "sing-box"
 	SingBoxContainerPrefix = "sing-box-" // 用于多配置容器命名
-	SingBoxImageName     = "ghcr.io/sagernet/sing-box:latest"
+	SingBoxImageName     = "ghcr.io/sagernet/sing-box:1.13.5"
 	ContainerConfigDir   = "/etc/sing-box"
 	ContainerDataDir     = "/var/lib/sing-box"
 	// 宿主机数据目录（通过环境变量配置，默认为 /root/singbox_data）
