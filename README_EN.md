@@ -101,12 +101,12 @@ services:
       - ./data:/home/data
     environment:
       - DATA_DIR=/home/data
-      - HOST_SINGBOX_DIR=${PWD}/data/singbox
+      - LISTEN_ADDR=127.0.0.1:7000
       - TZ=Asia/Shanghai
 ```
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 Visit http://127.0.0.1:7000
@@ -115,8 +115,8 @@ Visit http://127.0.0.1:7000
 > - Uses `network_mode: host` for direct host network access
 > - Listens on `127.0.0.1:7000` by default (local only), customizable via `LISTEN_ADDR`
 > - Mounts Docker Socket to manage the sing-box container
-> - `HOST_SINGBOX_DIR` ensures correct volume mounting in Docker-in-Docker setup
-> - Automatically pulls `ghcr.io/sagernet/sing-box:latest` on first start
+> - Host mount path is auto-detected, no manual configuration needed
+> - Bundled sing-box v1.13.5 image, auto-loaded on first start without network access
 
 ### Remote Access
 
@@ -137,7 +137,6 @@ Then visit http://127.0.0.1:7000 in your local browser.
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DATA_DIR` | Data directory inside container | `/home/data` |
-| `HOST_SINGBOX_DIR` | Host path for sing-box config | - |
 | `LISTEN_ADDR` | Server listen address | `127.0.0.1:7000` |
 | `TZ` | Timezone | `Asia/Shanghai` |
 

@@ -101,12 +101,12 @@ services:
       - ./data:/home/data
     environment:
       - DATA_DIR=/home/data
-      - HOST_SINGBOX_DIR=${PWD}/data/singbox
+      - LISTEN_ADDR=127.0.0.1:7000
       - TZ=Asia/Shanghai
 ```
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 访问 http://127.0.0.1:7000
@@ -115,8 +115,8 @@ docker-compose up -d
 > - 使用 `network_mode: host` 以便容器直接使用宿主机网络
 > - 默认监听 `127.0.0.1:7000`，仅本地访问，可通过 `LISTEN_ADDR` 环境变量自定义
 > - 挂载 Docker Socket 用于管理 sing-box 容器
-> - `HOST_SINGBOX_DIR` 用于 Docker-in-Docker 场景，确保 sing-box 容器正确挂载配置目录
-> - 首次启动会自动拉取 `ghcr.io/sagernet/sing-box:latest` 镜像
+> - 宿主机挂载路径自动探测，无需手动配置
+> - 内置 sing-box v1.13.5 镜像，首次启动自动加载，无需联网拉取
 
 ### 远程访问
 
@@ -137,7 +137,6 @@ ssh -L 7000:127.0.0.1:7000 user@your-server
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `DATA_DIR` | 容器内数据目录 | `/home/data` |
-| `HOST_SINGBOX_DIR` | 宿主机 sing-box 配置目录 | - |
 | `LISTEN_ADDR` | 服务监听地址 | `127.0.0.1:7000` |
 | `TZ` | 时区 | `Asia/Shanghai` |
 

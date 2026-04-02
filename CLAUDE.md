@@ -56,7 +56,7 @@ docker-compose up -d   # Production deployment
 
 ### Docker-in-Docker Pattern
 The UI container manages sing-box via Docker socket:
-- `HOST_SINGBOX_DIR` env var ensures correct volume mounting from host perspective
+- Host mount path auto-detected via Docker API (inspects own container mounts)
 - UI container creates/manages `ghcr.io/sagernet/sing-box` container
 - Config files stored in data directory, mounted into sing-box container
 - Container command: `-D /var/lib/sing-box -C /etc/sing-box/ run`
