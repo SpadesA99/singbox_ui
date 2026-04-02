@@ -26,12 +26,16 @@ RUN go mod tidy && \
 # 运行时阶段:只包含编译好的二进制文件
 FROM alpine:latest
 
+ARG TARGETARCH
 RUN apk --no-cache add ca-certificates tzdata
 
 WORKDIR /root/
 
 # 复制编译好的二进制文件
 COPY --from=builder /app/server/sing-box-ui .
+
+# 复制 CI 预拉取的 sing-box 镜像 tar（按架构区分）
+COPY singbox-${TARGETARCH}.tar /root/singbox-image.tar
 
 # 创建必要的目录
 RUN mkdir -p /root/sing-box /root/wireguard

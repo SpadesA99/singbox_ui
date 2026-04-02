@@ -17,6 +17,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{github.repository}}
+  SINGBOX_VERSION: v1.13.5
 
 jobs:
   build-and-push:
@@ -56,6 +57,16 @@ jobs:
             type=semver,pattern=major
             type=sha,prefix=branch-
             type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Pull and save sing-box images
+        run: |
+          docker pull --platform linux/amd64 ghcr.io/sagernet/sing-box:${{env.SINGBOX_VERSION}}
+          docker tag ghcr.io/sagernet/sing-box:${{env.SINGBOX_VERSION}} singbox:amd64
+          docker save singbox:amd64 -o singbox-amd64.tar
+
+          docker pull --platform linux/arm64 ghcr.io/sagernet/sing-box:${{env.SINGBOX_VERSION}}
+          docker tag ghcr.io/sagernet/sing-box:${{env.SINGBOX_VERSION}} singbox:arm64
+          docker save singbox:arm64 -o singbox-arm64.tar
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5

@@ -23,7 +23,9 @@ import (
 const (
 	SingBoxContainerName   = "sing-box"
 	SingBoxContainerPrefix = "sing-box-" // 用于多配置容器命名
-	SingBoxImageName       = "ghcr.io/sagernet/sing-box:v1.13.5"
+	SingBoxVersion         = "v1.13.5"
+	SingBoxImageName       = "ghcr.io/sagernet/sing-box:" + SingBoxVersion
+	SingBoxImageTarPath    = "/root/singbox-image.tar" // CI 预拉取的镜像 tar 文件路径
 	ContainerConfigDir     = "/etc/sing-box"
 	ContainerDataDir       = "/var/lib/sing-box"
 	// 宿主机数据目录（通过环境变量配置，默认为 /root/singbox_data）
@@ -57,7 +59,7 @@ func (d *DockerService) Close() error {
 	return nil
 }
 
-// EnsureImage 确保镜像存在，如不存在则拉取
+// EnsureImage 确保镜像存在：优先从内嵌 tar 加载，否则从远程拉取
 func (d *DockerService) EnsureImage() error {
 	log.Printf("Checking if image %s exists...", SingBoxImageName)
 
@@ -74,7 +76,14 @@ func (d *DockerService) EnsureImage() error {
 		return nil
 	}
 
-	// 拉取镜像
+	// 尝试从内嵌 tar 文件加载镜像
+	if err := d.loadImageFromFile(); err == nil {
+		return nil
+	} else {
+		log.Printf("No embedded image or load failed: %v, falling back to pull", err)
+	}
+
+	// 从远程拉取镜像
 	log.Printf("Pulling image %s...", SingBoxImageName)
 	reader, err := d.cli.ImagePull(d.ctx, SingBoxImageName, types.ImagePullOptions{})
 	if err != nil {
@@ -89,6 +98,63 @@ func (d *DockerService) EnsureImage() error {
 	}
 
 	log.Printf("Image %s pulled successfully", SingBoxImageName)
+	return nil
+}
+
+// loadImageFromFile 从内嵌的 tar 文件加载 Docker 镜像
+func (d *DockerService) loadImageFromFile() error {
+	tarPath := SingBoxImageTarPath
+	if _, err := os.Stat(tarPath); os.IsNotExist(err) {
+		return fmt.Errorf("image tar not found: %s", tarPath)
+	}
+
+	log.Printf("Loading image from %s...", tarPath)
+	file, err := os.Open(tarPath)
+	if err != nil {
+		return fmt.Errorf("failed to open image tar: %w", err)
+	}
+	defer file.Close()
+
+	resp, err := d.cli.ImageLoad(d.ctx, file, true)
+	if err != nil {
+		return fmt.Errorf("failed to load image: %w", err)
+	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
+
+	// tar 内的 tag 可能与期望不同（CI 使用临时 tag），需要重新 tag
+	// 查找刚加载的镜像并确保 SingBoxImageName tag 存在
+	images, err := d.cli.ImageList(d.ctx, types.ImageListOptions{})
+	if err == nil {
+		for _, img := range images {
+			for _, tag := range img.RepoTags {
+				if strings.HasPrefix(tag, "singbox:") {
+					// CI 产生的临时 tag，重新标记为正式名称
+					if err := d.cli.ImageTag(d.ctx, img.ID, SingBoxImageName); err != nil {
+						log.Printf("Warning: failed to re-tag image: %v", err)
+					} else {
+						log.Printf("Re-tagged %s -> %s", tag, SingBoxImageName)
+					}
+					break
+				}
+			}
+		}
+	}
+
+	// 验证镜像已正确加载
+	verifyImages, err := d.cli.ImageList(d.ctx, types.ImageListOptions{
+		Filters: filters.NewArgs(filters.Arg("reference", SingBoxImageName)),
+	})
+	if err != nil || len(verifyImages) == 0 {
+		return fmt.Errorf("image loaded but not found under expected tag %s", SingBoxImageName)
+	}
+
+	// 加载成功后删除 tar 文件释放磁盘空间
+	if err := os.Remove(tarPath); err != nil {
+		log.Printf("Warning: failed to remove image tar %s: %v", tarPath, err)
+	}
+
+	log.Printf("Image loaded from %s successfully", tarPath)
 	return nil
 }
 
