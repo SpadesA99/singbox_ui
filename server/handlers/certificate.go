@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"io"
 	"net/http"
 	"os"
@@ -8,6 +10,7 @@ import (
 	"singbox-config-service/services"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/curve25519"
 )
 
 // GenerateCertRequest 生成证书请求
@@ -235,5 +238,38 @@ func UploadCertificate(c *gin.Context) {
 		"valid_from":     certInfo.ValidFrom,
 		"valid_to":       certInfo.ValidTo,
 		"fingerprint":    certInfo.Fingerprint,
+	})
+}
+
+// GenerateRealityKeypair 生成 Reality x25519 密钥对
+func GenerateRealityKeypair(c *gin.Context) {
+	// 生成随机私钥
+	var privateKey [32]byte
+	if _, err := rand.Read(privateKey[:]); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Internal Server Error",
+			"message": "Failed to generate private key: " + err.Error(),
+		})
+		return
+	}
+
+	// Clamp private key for x25519
+	privateKey[0] &= 248
+	privateKey[31] &= 127
+	privateKey[31] |= 64
+
+	// 计算公钥
+	publicKey, err := curve25519.X25519(privateKey[:], curve25519.Basepoint)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Internal Server Error",
+			"message": "Failed to derive public key: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"private_key": base64.RawURLEncoding.EncodeToString(privateKey[:]),
+		"public_key":  base64.RawURLEncoding.EncodeToString(publicKey),
 	})
 }

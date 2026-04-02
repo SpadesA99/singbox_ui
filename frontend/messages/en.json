@@ -255,6 +255,7 @@
     "realityHandshakePort": "Handshake Port",
     "realityPrivateKey": "Private Key",
     "realityShortId": "Short ID",
+    "realityShortIdHint": "Hexadecimal string, 0-16 characters, even length",
     "generateKeys": "Generate Key Pair",
     "publicKey": "Public Key",
     "privateKey": "Private Key",

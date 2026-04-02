@@ -88,6 +88,13 @@ class ApiClient {
     });
   }
 
+  // 生成 Reality x25519 密钥对
+  async generateRealityKeypair(): Promise<{ private_key: string; public_key: string }> {
+    return this.request('/api/singbox/reality/keypair', {
+      method: 'POST',
+    });
+  }
+
   // 获取证书信息
   async getCertificateInfo(instance: string): Promise<CertificateInfo & { exists: boolean }> {
     return this.request(`/api/singbox/certificate?instance=${encodeURIComponent(instance)}`, {

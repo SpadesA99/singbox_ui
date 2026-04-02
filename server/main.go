@@ -65,6 +65,7 @@ func main() {
 			singbox.POST("/certificate", handlers.GenerateSelfSignedCert)
 			singbox.GET("/certificate", handlers.GetCertificateInfo)
 			singbox.POST("/certificate/upload", handlers.UploadCertificate)
+			singbox.POST("/reality/keypair", handlers.GenerateRealityKeypair)
 
 			// 多配置多容器管理
 			singbox.GET("/instances", handlers.ListNamedConfigs)

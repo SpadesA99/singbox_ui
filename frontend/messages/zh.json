@@ -255,6 +255,7 @@
     "realityHandshakePort": "握手端口",
     "realityPrivateKey": "私钥",
     "realityShortId": "Short ID",
+    "realityShortIdHint": "0-16 位偶数长度十六进制字符串",
     "generateKeys": "生成密钥对",
     "publicKey": "公钥",
     "privateKey": "私钥",

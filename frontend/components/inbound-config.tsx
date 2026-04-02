@@ -116,11 +116,16 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
     listen_port: 443,
     users: [{ uuid: "", name: "", flow: "" }] as VLESSUser[],
     tls_enabled: false,
-    tls_mode: "manual" as "manual" | "acme",
+    tls_mode: "manual" as "manual" | "acme" | "reality",
     tls_acme_domain: "",
     tls_certificate_path: "/etc/sing-box/cert.pem",
     tls_key_path: "/etc/sing-box/key.pem",
     tls_server_name: "",
+    reality_handshake_server: "",
+    reality_handshake_port: 443,
+    reality_private_key: "",
+    reality_public_key: "",
+    reality_short_id: "",
     transport_type: "tcp" as string, // "tcp" | "ws" | "grpc" | "http" | "httpupgrade"
     transport_path: "",
     transport_service_name: "",
@@ -307,11 +312,16 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
           listen_port: initialConfig.listen_port || 443,
           users: vlessUsers.length > 0 ? vlessUsers : [{ uuid: "", name: "", flow: "" }],
           tls_enabled: initialConfig.tls?.enabled || false,
-          tls_mode: (initialConfig.tls?.acme?.domain?.length ?? 0) > 0 ? "acme" : "manual",
+          tls_mode: initialConfig.tls?.reality?.enabled ? "reality" : (initialConfig.tls?.acme?.domain?.length ?? 0) > 0 ? "acme" : "manual",
           tls_acme_domain: initialConfig.tls?.acme?.domain?.[0] || "",
           tls_certificate_path: initialConfig.tls?.certificate_path || "/etc/sing-box/cert.pem",
           tls_key_path: initialConfig.tls?.key_path || "/etc/sing-box/key.pem",
           tls_server_name: initialConfig.tls?.server_name || "",
+          reality_handshake_server: initialConfig.tls?.reality?.handshake?.server || "",
+          reality_handshake_port: initialConfig.tls?.reality?.handshake?.server_port || 443,
+          reality_private_key: initialConfig.tls?.reality?.private_key || "",
+          reality_public_key: "",
+          reality_short_id: initialConfig.tls?.reality?.short_id?.[0] || "",
           transport_type: initialConfig.transport?.type || "tcp",
           transport_path: initialConfig.transport?.path || "",
           transport_service_name: initialConfig.transport?.service_name || "",
@@ -539,7 +549,22 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
         }
         // 添加 TLS 配置
         if (vlessConfig.tls_enabled) {
-          if (vlessConfig.tls_mode === "acme" && vlessConfig.tls_acme_domain) {
+          if (vlessConfig.tls_mode === "reality") {
+            previewConfig.tls = {
+              enabled: true,
+              server_name: vlessConfig.tls_server_name || vlessConfig.reality_handshake_server,
+              reality: {
+                enabled: true,
+                handshake: {
+                  server: vlessConfig.reality_handshake_server,
+                  server_port: vlessConfig.reality_handshake_port,
+                },
+                private_key: vlessConfig.reality_private_key,
+                short_id: vlessConfig.reality_short_id ? [vlessConfig.reality_short_id] : [""],
+                max_time_difference: "1m",
+              },
+            }
+          } else if (vlessConfig.tls_mode === "acme" && vlessConfig.tls_acme_domain) {
             previewConfig.tls = {
               enabled: true,
               acme: {
@@ -554,7 +579,7 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
               key_path: vlessConfig.tls_key_path,
             }
           }
-          if (vlessConfig.tls_server_name) {
+          if (vlessConfig.tls_server_name && vlessConfig.tls_mode !== "reality") {
             previewConfig.tls.server_name = vlessConfig.tls_server_name
           }
         }
@@ -979,8 +1004,25 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
 
       const params = new URLSearchParams()
       params.set("encryption", "none")
-      params.set("type", "tcp")
-      if (user.flow) params.set("flow", user.flow)
+      params.set("type", vlessConfig.transport_type === "tcp" ? "tcp" : vlessConfig.transport_type)
+      if (user.flow && vlessConfig.transport_type === "tcp") params.set("flow", user.flow)
+      if (vlessConfig.transport_type === "ws" && vlessConfig.transport_path) params.set("path", vlessConfig.transport_path)
+      if (vlessConfig.transport_type === "grpc" && vlessConfig.transport_service_name) params.set("serviceName", vlessConfig.transport_service_name)
+      if (vlessConfig.transport_type === "http" && vlessConfig.transport_path) params.set("path", vlessConfig.transport_path)
+      if (vlessConfig.transport_type === "httpupgrade" && vlessConfig.transport_path) params.set("path", vlessConfig.transport_path)
+
+      if (vlessConfig.tls_enabled) {
+        if (vlessConfig.tls_mode === "reality") {
+          params.set("security", "reality")
+          if (vlessConfig.tls_server_name) params.set("sni", vlessConfig.tls_server_name)
+          if (vlessConfig.reality_short_id) params.set("sid", vlessConfig.reality_short_id)
+          if (vlessConfig.reality_public_key) params.set("pbk", vlessConfig.reality_public_key)
+          params.set("fp", "chrome")
+        } else {
+          params.set("security", "tls")
+          if (vlessConfig.tls_server_name) params.set("sni", vlessConfig.tls_server_name)
+        }
+      }
 
       const name = user.name || `VLESS-${userIndex + 1}`
       const vlessUrl = `vless://${user.uuid}@${ip}:${vlessConfig.listen_port}?${params.toString()}#${encodeURIComponent(name)}`
@@ -1664,7 +1706,7 @@ PersistentKeepalive = 25`
                       }}
                     >
                       <option value="">{t("noneDefault")}</option>
-                      <option value="xtls-rprx-vision">{t("xtlsRecommended")}</option>
+                      <option value="xtls-rprx-vision" disabled={vlessConfig.transport_type !== "tcp"}>{t("xtlsRecommended")}</option>
                     </select>
                     {user.flow === "xtls-rprx-vision" && !vlessConfig.tls_enabled && (
                       <p className="text-xs text-amber-600">{t("xtlsRequiresTls")}</p>
@@ -1692,11 +1734,12 @@ PersistentKeepalive = 25`
                 <div className="flex gap-2 items-center">
                   <select
                     value={vlessConfig.tls_mode}
-                    onChange={(e) => setVlessConfig({ ...vlessConfig, tls_mode: e.target.value as "manual" | "acme" })}
+                    onChange={(e) => setVlessConfig({ ...vlessConfig, tls_mode: e.target.value as "manual" | "acme" | "reality" })}
                     className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
                   >
                     <option value="manual">{t("manualConfig")}</option>
                     <option value="acme">{t("acmeAuto")}</option>
+                    <option value="reality">Reality</option>
                   </select>
                   {vlessConfig.tls_mode === "manual" && (
                     <>
@@ -1728,7 +1771,126 @@ PersistentKeepalive = 25`
                     </span>
                   )}
                 </div>
-                {vlessConfig.tls_mode === "acme" ? (
+                {vlessConfig.tls_mode === "reality" ? (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>{t("realityHandshakeServer")}</Label>
+                        <Input
+                          value={vlessConfig.reality_handshake_server}
+                          onChange={(e) => {
+                            const server = e.target.value
+                            const updates: any = { reality_handshake_server: server }
+                            // 自动同步 server_name（如果用户没有手动修改过）
+                            if (!vlessConfig.tls_server_name || vlessConfig.tls_server_name === vlessConfig.reality_handshake_server) {
+                              updates.tls_server_name = server
+                            }
+                            setVlessConfig({ ...vlessConfig, ...updates })
+                          }}
+                          placeholder="www.example.com"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t("realityHandshakePort")}</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="65535"
+                          value={vlessConfig.reality_handshake_port}
+                          onChange={(e) => {
+                            const port = parsePort(e.target.value, vlessConfig.reality_handshake_port)
+                            setVlessConfig({ ...vlessConfig, reality_handshake_port: port })
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>SNI ({t("serverNameOptional")})</Label>
+                      <Input
+                        value={vlessConfig.tls_server_name}
+                        onChange={(e) => setVlessConfig({ ...vlessConfig, tls_server_name: e.target.value })}
+                        placeholder={vlessConfig.reality_handshake_server || "example.com"}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {vlessConfig.reality_handshake_server
+                          ? `默认使用握手服务器: ${vlessConfig.reality_handshake_server}`
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>{t("realityPrivateKey")}</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              const response = await apiClient.generateRealityKeypair()
+                              if (response.private_key) {
+                                setVlessConfig((prev) => ({
+                                  ...prev,
+                                  reality_private_key: response.private_key,
+                                  reality_public_key: response.public_key || "",
+                                }))
+                                if (response.public_key) {
+                                  try {
+                                    await navigator.clipboard.writeText(response.public_key)
+                                  } catch {
+                                    // clipboard may fail in non-HTTPS contexts
+                                  }
+                                }
+                              }
+                            } catch {
+                              setError(t("generateKeysFailed"))
+                            }
+                          }}
+                        >
+                          <Key className="h-4 w-4 mr-1" />
+                          {t("generateKeys")}
+                        </Button>
+                      </div>
+                      <Input
+                        value={vlessConfig.reality_private_key}
+                        onChange={(e) => setVlessConfig({ ...vlessConfig, reality_private_key: e.target.value })}
+                        placeholder="Private Key"
+                      />
+                      {vlessConfig.reality_public_key && (
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs text-muted-foreground shrink-0">{t("publicKey")}:</Label>
+                          <code className="text-xs bg-muted px-2 py-1 rounded flex-1 truncate">{vlessConfig.reality_public_key}</code>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(vlessConfig.reality_public_key)
+                                setError(t("keyCopied"))
+                                setTimeout(() => setError(""), 3000)
+                              } catch {
+                                // fallback: select text
+                              }
+                            }}
+                          >
+                            {t("copyPublicKey")}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("realityShortId")}</Label>
+                      <Input
+                        value={vlessConfig.reality_short_id}
+                        onChange={(e) => setVlessConfig({ ...vlessConfig, reality_short_id: e.target.value })}
+                        placeholder="0123456789abcdef"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {t("realityShortIdHint")}
+                      </p>
+                    </div>
+                  </div>
+                ) : vlessConfig.tls_mode === "acme" ? (
                   <div className="space-y-2">
                     <Label>{t("acmeDomain")}</Label>
                     <Input
@@ -1776,7 +1938,17 @@ PersistentKeepalive = 25`
             <select
               className="w-full h-9 px-3 rounded-md border border-input bg-transparent"
               value={vlessConfig.transport_type}
-              onChange={(e) => setVlessConfig({ ...vlessConfig, transport_type: e.target.value })}
+              onChange={(e) => {
+                const newTransport = e.target.value
+                const updates: any = { transport_type: newTransport }
+                // xtls-rprx-vision 仅支持 TCP 传输
+                if (newTransport !== "tcp") {
+                  updates.users = vlessConfig.users.map((u) =>
+                    u.flow ? { ...u, flow: "" } : u
+                  )
+                }
+                setVlessConfig({ ...vlessConfig, ...updates })
+              }}
             >
               <option value="tcp">{t("tcpDefault")}</option>
               <option value="ws">WebSocket</option>
