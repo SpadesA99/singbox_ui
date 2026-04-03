@@ -51,14 +51,14 @@ func GenerateSelfSignedCert(c *gin.Context) {
 
 	// 返回容器内的路径（sing-box 容器中的路径）
 	c.JSON(http.StatusOK, gin.H{
-		"cert_path":        "/etc/sing-box/cert.pem",
-		"key_path":         "/etc/sing-box/key.pem",
-		"host_cert_path":   certInfo.CertPath,
-		"host_key_path":    certInfo.KeyPath,
-		"common_name":      certInfo.CommonName,
-		"valid_from":       certInfo.ValidFrom,
-		"valid_to":         certInfo.ValidTo,
-		"fingerprint":      certInfo.Fingerprint,
+		"cert_path":      "/etc/sing-box/cert.pem",
+		"key_path":       "/etc/sing-box/key.pem",
+		"host_cert_path": certInfo.CertPath,
+		"host_key_path":  certInfo.KeyPath,
+		"common_name":    certInfo.CommonName,
+		"valid_from":     certInfo.ValidFrom,
+		"valid_to":       certInfo.ValidTo,
+		"fingerprint":    certInfo.Fingerprint,
 	})
 }
 
@@ -96,25 +96,21 @@ func GetCertificateInfo(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"exists":          true,
-		"cert_path":       "/etc/sing-box/cert.pem",
-		"key_path":        "/etc/sing-box/key.pem",
-		"host_cert_path":  certInfo.CertPath,
-		"host_key_path":   certInfo.KeyPath,
-		"common_name":     certInfo.CommonName,
-		"valid_from":      certInfo.ValidFrom,
-		"valid_to":        certInfo.ValidTo,
-		"fingerprint":     certInfo.Fingerprint,
+		"exists":         true,
+		"cert_path":      "/etc/sing-box/cert.pem",
+		"key_path":       "/etc/sing-box/key.pem",
+		"host_cert_path": certInfo.CertPath,
+		"host_key_path":  certInfo.KeyPath,
+		"common_name":    certInfo.CommonName,
+		"valid_from":     certInfo.ValidFrom,
+		"valid_to":       certInfo.ValidTo,
+		"fingerprint":    certInfo.Fingerprint,
 	})
 }
 
 // getInstanceCertDir 获取实例证书目录
 func getInstanceCertDir(instance string) string {
-	baseDir := os.Getenv("DATA_DIR")
-	if baseDir == "" {
-		baseDir = "./data"
-	}
-	return filepath.Join(baseDir, "singbox", "configs", instance)
+	return filepath.Join(services.GetSingboxDir(), "configs", instance)
 }
 
 // UploadCertificate 上传证书文件

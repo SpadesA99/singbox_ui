@@ -320,7 +320,7 @@ export function SubscriptionManager({ onNodeSelect, onNodesLoaded }: Subscriptio
         try {
           const status = await apiClient.getProberStatus()
           // 如果 prober 不在运行或已完成一轮探测，保存结果
-          if (!status.running || status.node_count === status.online_count + status.offline_count) {
+          if (!status.running || status.totalNodes === status.onlineNodes + status.offlineNodes + status.timeoutNodes) {
             await apiClient.saveProberResults()
             await loadSubscriptions()
             setProbing(false)

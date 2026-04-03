@@ -4,9 +4,12 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -97,6 +100,90 @@ func ResolveUserAgent(ua string) string {
 }
 
 // FetchSubscription 获取订阅内容
+var blockedSubscriptionPrefixes = []netip.Prefix{
+	netip.MustParsePrefix("0.0.0.0/8"),
+	netip.MustParsePrefix("10.0.0.0/8"),
+	netip.MustParsePrefix("100.64.0.0/10"),
+	netip.MustParsePrefix("127.0.0.0/8"),
+	netip.MustParsePrefix("169.254.0.0/16"),
+	netip.MustParsePrefix("172.16.0.0/12"),
+	netip.MustParsePrefix("192.0.0.0/24"),
+	netip.MustParsePrefix("192.0.2.0/24"),
+	netip.MustParsePrefix("192.168.0.0/16"),
+	netip.MustParsePrefix("198.18.0.0/15"),
+	netip.MustParsePrefix("198.51.100.0/24"),
+	netip.MustParsePrefix("203.0.113.0/24"),
+	netip.MustParsePrefix("224.0.0.0/4"),
+	netip.MustParsePrefix("240.0.0.0/4"),
+	netip.MustParsePrefix("::/128"),
+	netip.MustParsePrefix("::1/128"),
+	netip.MustParsePrefix("fe80::/10"),
+	netip.MustParsePrefix("fc00::/7"),
+	netip.MustParsePrefix("ff00::/8"),
+	netip.MustParsePrefix("2001:db8::/32"),
+}
+
+func allowInsecureSubscriptionTLS() bool {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv("SUBSCRIPTION_INSECURE_TLS")))
+	return value == "1" || value == "true" || value == "yes"
+}
+
+func isPublicSubscriptionAddr(ip net.IP) bool {
+	addr, ok := netip.AddrFromSlice(ip)
+	if !ok {
+		return false
+	}
+	addr = addr.Unmap()
+	for _, prefix := range blockedSubscriptionPrefixes {
+		if prefix.Contains(addr) {
+			return false
+		}
+	}
+	return true
+}
+
+func validateSubscriptionHost(host string) error {
+	normalizedHost := strings.Trim(strings.TrimSpace(host), "[]")
+	if normalizedHost == "" {
+		return fmt.Errorf("subscription URL host is empty")
+	}
+	if strings.EqualFold(normalizedHost, "localhost") {
+		return fmt.Errorf("subscription host localhost is not allowed")
+	}
+
+	if ip := net.ParseIP(normalizedHost); ip != nil {
+		if !isPublicSubscriptionAddr(ip) {
+			return fmt.Errorf("subscription host %s is not a public address", normalizedHost)
+		}
+		return nil
+	}
+
+	ips, err := net.LookupIP(normalizedHost)
+	if err != nil {
+		return fmt.Errorf("failed to resolve subscription host %s: %w", normalizedHost, err)
+	}
+	if len(ips) == 0 {
+		return fmt.Errorf("subscription host %s resolves to no address", normalizedHost)
+	}
+	for _, ip := range ips {
+		if !isPublicSubscriptionAddr(ip) {
+			return fmt.Errorf("subscription host %s resolves to non-public address %s", normalizedHost, ip.String())
+		}
+	}
+
+	return nil
+}
+
+func validateSubscriptionURL(parsedURL *url.URL) error {
+	if parsedURL == nil {
+		return fmt.Errorf("subscription URL is nil")
+	}
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return fmt.Errorf("unsupported URL scheme: %s (only http/https allowed)", parsedURL.Scheme)
+	}
+	return validateSubscriptionHost(parsedURL.Hostname())
+}
+
 func FetchSubscription(subURL string, userAgent ...string) ([]ProxyNode, error) {
 	// 验证 URL 格式
 	parsedURL, err := url.Parse(subURL)
@@ -105,21 +192,31 @@ func FetchSubscription(subURL string, userAgent ...string) ([]ProxyNode, error) 
 	}
 
 	// 只允许 http 和 https 协议
-	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		return nil, fmt.Errorf("unsupported URL scheme: %s (only http/https allowed)", parsedURL.Scheme)
+	if err := validateSubscriptionURL(parsedURL); err != nil {
+		return nil, err
 	}
 
 	// 创建 HTTP 客户端，跳过 SSL 验证，设置超时
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		Proxy: http.ProxyFromEnvironment,
+		TLSClientConfig: &tls.Config{
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: allowInsecureSubscriptionTLS(),
+		},
 	}
 	client := &http.Client{
 		Transport: tr,
 		Timeout:   30 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 5 {
+				return errors.New("too many redirects while fetching subscription")
+			}
+			return validateSubscriptionURL(req.URL)
+		},
 	}
 
 	// 创建请求并设置 User-Agent
-	req, err := http.NewRequest("GET", subURL, nil)
+	req, err := http.NewRequest("GET", parsedURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -240,7 +337,7 @@ type ClashProxy struct {
 	// Client Fingerprint
 	ClientFingerprint string `yaml:"client-fingerprint"`
 	// SS plugin
-	Plugin     string            `yaml:"plugin"`
+	Plugin     string                 `yaml:"plugin"`
 	PluginOpts map[string]interface{} `yaml:"plugin-opts"`
 }
 

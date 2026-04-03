@@ -47,39 +47,6 @@ class ApiClient {
       method: 'POST',
     });
   }
-
-  // 生成 VLESS 配置
-  async generateVLESSConfig(config: VLESSConfigParams): Promise<XrayConfig> {
-    return this.request('/api/config/vless', {
-      method: 'POST',
-      body: JSON.stringify(config),
-    });
-  }
-
-  // 生成 VMess 配置
-  async generateVMessConfig(config: VMessConfigParams): Promise<XrayConfig> {
-    return this.request('/api/config/vmess', {
-      method: 'POST',
-      body: JSON.stringify(config),
-    });
-  }
-
-  // 生成 Trojan 配置
-  async generateTrojanConfig(config: TrojanConfigParams): Promise<XrayConfig> {
-    return this.request('/api/config/trojan', {
-      method: 'POST',
-      body: JSON.stringify(config),
-    });
-  }
-
-  // 生成 WireGuard 配置
-  async generateWireGuardConfig(config: WireGuardConfigParams): Promise<XrayConfig> {
-    return this.request('/api/config/wireguard', {
-      method: 'POST',
-      body: JSON.stringify(config),
-    });
-  }
-
   // 生成自签名证书（到实例目录）
   async generateSelfSignedCert(instance: string, domain: string, validDays: number = 365): Promise<CertificateInfo> {
     return this.request('/api/singbox/certificate', {
@@ -261,59 +228,6 @@ class ApiClient {
 export const apiClient = new ApiClient(API_BASE_URL);
 
 // 类型定义
-export interface VLESSConfigParams {
-  address: string;
-  port: number;
-  uuid: string;
-  flow?: string;
-  encryption?: string;
-  network: string;
-  security?: string;
-  sni?: string;
-}
-
-export interface VMessConfigParams {
-  address: string;
-  port: number;
-  uuid: string;
-  alterId?: number;
-  security?: string;
-  network: string;
-  tls?: string;
-  sni?: string;
-}
-
-export interface TrojanConfigParams {
-  address: string;
-  port: number;
-  password: string;
-  sni?: string;
-  network: string;
-}
-
-export interface WireGuardConfigParams {
-  privateKey: string;
-  address: string[];
-  peers: WireGuardPeer[];
-  mtu?: number;
-}
-
-export interface WireGuardPeer {
-  publicKey: string;
-  endpoint: string;
-  allowedIPs: string[];
-}
-
-export interface XrayConfig {
-  log?: {
-    level?: string;
-    access?: string;
-    error?: string;
-  };
-  inbounds: any[];
-  outbounds: any[];
-  route?: any;
-}
 
 export interface CertificateInfo {
   cert_path: string;
@@ -355,8 +269,14 @@ export interface ProbeResult {
 
 export interface ProberStats {
   running: boolean;
-  node_count: number;
-  online_count: number;
-  offline_count: number;
-  last_probe_time: string;
+  totalNodes: number;
+  onlineNodes: number;
+  offlineNodes: number;
+  timeoutNodes: number;
+  config: {
+    probeInterval: string;
+    probeTimeout: string;
+    maxRetries: number;
+    maxConcurrent: number;
+  };
 }

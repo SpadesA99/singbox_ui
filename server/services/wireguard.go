@@ -35,7 +35,9 @@ type KeyCacheResponse struct {
 	PublicKey  string `json:"publicKey"`
 }
 
-const keysCacheFile = "singbox/wireguard_keys_cache.txt"
+func getKeysCacheFilePath() string {
+	return filepath.Join(singboxDir, "wireguard_keys_cache.txt")
+}
 
 // GenerateWireGuardKeysWithCache 生成带缓存的 WireGuard 密钥对
 // ip: 必须指定的完整IP地址，如 "10.10.0.5"
@@ -99,6 +101,7 @@ func GenerateWireGuardKeysWithCache(ip string) (*KeyCacheResponse, error) {
 
 // loadKeysCache 加载密钥缓存
 func loadKeysCache() ([]KeyCacheEntry, error) {
+	keysCacheFile := getKeysCacheFilePath()
 	// 确保数据目录存在
 	dataDir := filepath.Dir(keysCacheFile)
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
@@ -142,6 +145,7 @@ func loadKeysCache() ([]KeyCacheEntry, error) {
 
 // saveKeysCache 保存密钥缓存
 func saveKeysCache(cache []KeyCacheEntry) error {
+	keysCacheFile := getKeysCacheFilePath()
 	// 确保数据目录存在
 	dataDir := filepath.Dir(keysCacheFile)
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
