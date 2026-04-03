@@ -67,6 +67,7 @@ func main() {
 			singbox.POST("/certificate/upload", handlers.UploadCertificate)
 			singbox.POST("/reality/keypair", handlers.GenerateRealityKeypair)
 			singbox.POST("/reality/public-key", handlers.DeriveRealityPublicKey)
+			singbox.POST("/reality/check-tls", handlers.CheckTLS13Support)
 
 			// 多配置多容器管理
 			singbox.GET("/instances", handlers.ListNamedConfigs)

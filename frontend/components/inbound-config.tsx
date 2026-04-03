@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Trash2, Key, QrCode, Shield, Upload } from "lucide-react"
+import { Plus, Trash2, Key, QrCode, Shield, Upload, Loader2, CheckCircle, XCircle } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 import {
   Dialog,
@@ -130,6 +130,12 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
     transport_path: "",
     transport_service_name: "",
   })
+
+  // TLS 1.3 检测状态
+  const [tlsCheckState, setTlsCheckState] = useState<{
+    loading: boolean
+    result?: { supported: boolean; tls_version: string; error?: string }
+  }>({ loading: false })
 
   // WireGuard 配置 (sing-box 格式)
   const [wgConfig, setWgConfig] = useState({
@@ -1784,19 +1790,55 @@ PersistentKeepalive = 25`
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>{t("realityHandshakeServer")}</Label>
-                        <Input
-                          value={vlessConfig.reality_handshake_server}
-                          onChange={(e) => {
-                            const server = e.target.value
-                            const updates: any = { reality_handshake_server: server }
-                            // 自动同步 server_name（如果用户没有手动修改过）
-                            if (!vlessConfig.tls_server_name || vlessConfig.tls_server_name === vlessConfig.reality_handshake_server) {
-                              updates.tls_server_name = server
-                            }
-                            setVlessConfig({ ...vlessConfig, ...updates })
-                          }}
-                          placeholder="www.example.com"
-                        />
+                        <div className="flex gap-2">
+                          <Input
+                            value={vlessConfig.reality_handshake_server}
+                            onChange={(e) => {
+                              const server = e.target.value
+                              const updates: any = { reality_handshake_server: server }
+                              if (!vlessConfig.tls_server_name || vlessConfig.tls_server_name === vlessConfig.reality_handshake_server) {
+                                updates.tls_server_name = server
+                              }
+                              setVlessConfig({ ...vlessConfig, ...updates })
+                              setTlsCheckState({ loading: false })
+                            }}
+                            placeholder="www.example.com"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                            disabled={!vlessConfig.reality_handshake_server || tlsCheckState.loading}
+                            onClick={async () => {
+                              setTlsCheckState({ loading: true })
+                              try {
+                                const res = await apiClient.checkTls13Support(
+                                  vlessConfig.reality_handshake_server,
+                                  vlessConfig.reality_handshake_port
+                                )
+                                setTlsCheckState({ loading: false, result: res })
+                              } catch {
+                                setTlsCheckState({ loading: false, result: { supported: false, tls_version: "", error: t("tlsCheckFailed") } })
+                              }
+                            }}
+                          >
+                            {tlsCheckState.loading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              t("tlsCheck")
+                            )}
+                          </Button>
+                        </div>
+                        {tlsCheckState.result && (
+                          <p className={`text-xs flex items-center gap-1 ${tlsCheckState.result.supported ? "text-green-600" : "text-red-500"}`}>
+                            {tlsCheckState.result.supported ? (
+                              <><CheckCircle className="h-3 w-3" /> {t("tlsCheckPass")} ({tlsCheckState.result.tls_version})</>
+                            ) : (
+                              <><XCircle className="h-3 w-3" /> {tlsCheckState.result.error || `${t("tlsCheckFail")} (${tlsCheckState.result.tls_version || "N/A"})`}</>
+                            )}
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>{t("realityHandshakePort")}</Label>

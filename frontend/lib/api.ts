@@ -103,6 +103,14 @@ class ApiClient {
     });
   }
 
+  // 检测域名是否支持 TLS 1.3
+  async checkTls13Support(server: string, port: number = 443): Promise<{ supported: boolean; tls_version: string; error?: string }> {
+    return this.request('/api/singbox/reality/check-tls', {
+      method: 'POST',
+      body: JSON.stringify({ server, port }),
+    });
+  }
+
   // 获取证书信息
   async getCertificateInfo(instance: string): Promise<CertificateInfo & { exists: boolean }> {
     return this.request(`/api/singbox/certificate?instance=${encodeURIComponent(instance)}`, {
