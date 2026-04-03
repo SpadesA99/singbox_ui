@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -26,6 +26,7 @@ export function TrojanForm({
 }: ProtocolFormProps) {
   const { t } = useTranslation("inbound")
   const { t: tc } = useTranslation("common")
+  const isInitializedRef = useRef(false)
 
   const [trojanConfig, setTrojanConfig] = useState({
     listen: "0.0.0.0",
@@ -48,7 +49,11 @@ export function TrojanForm({
 
   // Load from initialConfig
   useEffect(() => {
-    if (!initialConfig || initialConfig.type !== "trojan") return
+    if (isInitializedRef.current) return
+    if (!initialConfig || initialConfig.type !== "trojan") {
+      isInitializedRef.current = true
+      return
+    }
     const trojanUsers = (initialConfig.users || []).map((u: any) => ({
       name: u.name || "",
       password: u.password || "",
@@ -71,10 +76,12 @@ export function TrojanForm({
       multiplex_enabled: initialConfig.multiplex?.enabled || false,
       multiplex_padding: initialConfig.multiplex?.padding || false,
     })
+    isInitializedRef.current = true
   }, [initialConfig])
 
   // Build and push config to store
   useEffect(() => {
+    if (!isInitializedRef.current) return
     const trojanUsersBuilt = trojanConfig.users
       .filter((u) => u.password)
       .map((u) => {
@@ -141,7 +148,7 @@ export function TrojanForm({
 
     clearEndpoints()
     setInbound(0, previewConfig)
-  }, [trojanConfig, currentInstance])
+  }, [trojanConfig, setInbound, clearEndpoints])
 
   const showTrojanQrCode = async (userIndex: number) => {
     try {

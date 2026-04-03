@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -42,6 +42,7 @@ export function Hysteria2Form({
 }: ProtocolFormProps) {
   const { t } = useTranslation("inbound")
   const { t: tc } = useTranslation("common")
+  const isInitializedRef = useRef(false)
 
   const [hy2Config, setHy2Config] = useState<Hysteria2Config>({
     listen: "0.0.0.0",
@@ -63,7 +64,11 @@ export function Hysteria2Form({
 
   // Load from initialConfig
   useEffect(() => {
-    if (!initialConfig || initialConfig.type !== "hysteria2") return
+    if (isInitializedRef.current) return
+    if (!initialConfig || initialConfig.type !== "hysteria2") {
+      isInitializedRef.current = true
+      return
+    }
     setHy2Config({
       listen: parseListen(initialConfig.listen),
       listen_port: initialConfig.listen_port || 443,
@@ -81,10 +86,12 @@ export function Hysteria2Form({
       masquerade: typeof initialConfig.masquerade === "string" ? initialConfig.masquerade : "",
       ignore_client_bandwidth: initialConfig.ignore_client_bandwidth || false,
     })
+    isInitializedRef.current = true
   }, [initialConfig])
 
   // Build and push config to store
   useEffect(() => {
+    if (!isInitializedRef.current) return
     const hy2User: any = { password: hy2Config.password }
     if (hy2Config.user_name) {
       hy2User.name = hy2Config.user_name
@@ -120,9 +127,9 @@ export function Hysteria2Form({
     if (hy2Config.ignore_client_bandwidth) {
       previewConfig.ignore_client_bandwidth = true
     }
-    setInbound(0, previewConfig)
     clearEndpoints()
-  }, [hy2Config])
+    setInbound(0, previewConfig)
+  }, [hy2Config, setInbound, clearEndpoints])
 
   const showHysteria2QrCode = async () => {
     onError("")

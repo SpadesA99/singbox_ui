@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -19,6 +19,7 @@ export function WireguardForm({
 }: ProtocolFormProps) {
   const { t } = useTranslation("inbound")
   const { t: tc } = useTranslation("common")
+  const isInitializedRef = useRef(false)
 
   const [wgConfig, setWgConfig] = useState({
     listen_port: 5353,
@@ -30,6 +31,7 @@ export function WireguardForm({
 
   // Loading useEffect
   useEffect(() => {
+    if (isInitializedRef.current) return
     const wgEndpoint = initialEndpoint?.type === "wireguard" ? initialEndpoint : null
     const loadedPeers = ((wgEndpoint?.peers || initialConfig.peers) || []).map((peer: any) => ({
       publicKey: peer.public_key || "",
@@ -43,10 +45,12 @@ export function WireguardForm({
       peers: loadedPeers.length > 0 ? loadedPeers : [{ publicKey: "", allowedIPs: ["10.10.0.2/32"] }],
       mtu: wgEndpoint?.mtu || initialConfig.mtu || 1420,
     })
+    isInitializedRef.current = true
   }, [initialConfig, initialEndpoint])
 
   // Building useEffect — WireGuard is an endpoint, not an inbound
   useEffect(() => {
+    if (!isInitializedRef.current) return
     const wgPeers = wgConfig.peers
       .filter((p) => p.publicKey)
       .map((p) => ({

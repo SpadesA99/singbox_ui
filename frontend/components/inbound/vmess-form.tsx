@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -26,6 +26,7 @@ export function VmessForm({
 }: ProtocolFormProps) {
   const { t } = useTranslation("inbound")
   const { t: tc } = useTranslation("common")
+  const isInitializedRef = useRef(false)
 
   const [vmessConfig, setVmessConfig] = useState({
     listen: "0.0.0.0",
@@ -46,7 +47,11 @@ export function VmessForm({
 
   // Load from initialConfig
   useEffect(() => {
-    if (!initialConfig || initialConfig.type !== "vmess") return
+    if (isInitializedRef.current) return
+    if (!initialConfig || initialConfig.type !== "vmess") {
+      isInitializedRef.current = true
+      return
+    }
     const vmessUsers = (initialConfig.users || []).map((u: any) => ({
       uuid: u.uuid || "",
       name: u.name || "",
@@ -68,10 +73,12 @@ export function VmessForm({
       multiplex_enabled: initialConfig.multiplex?.enabled || false,
       multiplex_padding: initialConfig.multiplex?.padding || false,
     })
+    isInitializedRef.current = true
   }, [initialConfig])
 
   // Build and push config to store
   useEffect(() => {
+    if (!isInitializedRef.current) return
     const vmessUsers = vmessConfig.users
       .filter((u) => u.uuid)
       .map((u) => {
@@ -129,7 +136,7 @@ export function VmessForm({
 
     clearEndpoints()
     setInbound(0, previewConfig)
-  }, [vmessConfig, currentInstance])
+  }, [vmessConfig, setInbound, clearEndpoints])
 
   const showVmessQrCode = async (userIndex: number) => {
     try {

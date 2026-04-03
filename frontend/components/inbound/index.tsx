@@ -223,6 +223,9 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
               {qrCodeType === "socks5" && t("qrCodeTitleMixed")}
               {qrCodeType === "vless" && t("qrCodeTitleVless")}
               {qrCodeType === "hysteria2" && t("qrCodeTitleHysteria2")}
+              {qrCodeType === "vmess" && t("qrCodeTitleVmess")}
+              {qrCodeType === "trojan" && t("qrCodeTitleTrojan")}
+              {qrCodeType === "tuic" && t("qrCodeTitleTuic")}
             </DialogTitle>
             <DialogDescription>
               {qrCodeType === "wireguard" && t("qrCodeDescWireguard", { n: selectedPeerIndex + 1 })}
@@ -230,6 +233,9 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
               {qrCodeType === "socks5" && t("qrCodeDescSocks5")}
               {qrCodeType === "vless" && t("qrCodeDescVless", { n: selectedPeerIndex + 1 })}
               {qrCodeType === "hysteria2" && t("qrCodeDescHysteria2")}
+              {qrCodeType === "vmess" && t("qrCodeDescVmess", { n: selectedPeerIndex + 1 })}
+              {qrCodeType === "trojan" && t("qrCodeDescTrojan", { n: selectedPeerIndex + 1 })}
+              {qrCodeType === "tuic" && t("qrCodeDescTuic", { n: selectedPeerIndex + 1 })}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center gap-4 py-4">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -30,6 +30,7 @@ export function ShadowsocksForm({
 }: ProtocolFormProps) {
   const { t } = useTranslation("inbound")
   const { t: tc } = useTranslation("common")
+  const isInitializedRef = useRef(false)
 
   const [ssConfig, setSsConfig] = useState<ShadowsocksConfig>({
     listen: "0.0.0.0",
@@ -43,7 +44,11 @@ export function ShadowsocksForm({
 
   // Load from initialConfig
   useEffect(() => {
-    if (!initialConfig || initialConfig.type !== "shadowsocks") return
+    if (isInitializedRef.current) return
+    if (!initialConfig || initialConfig.type !== "shadowsocks") {
+      isInitializedRef.current = true
+      return
+    }
     setSsConfig({
       listen: parseListen(initialConfig.listen),
       listen_port: initialConfig.listen_port || 8388,
@@ -53,10 +58,12 @@ export function ShadowsocksForm({
       multiplex_enabled: initialConfig.multiplex?.enabled || false,
       multiplex_padding: initialConfig.multiplex?.padding || false,
     })
+    isInitializedRef.current = true
   }, [initialConfig])
 
   // Build and push config to store
   useEffect(() => {
+    if (!isInitializedRef.current) return
     const previewConfig: any = {
       type: "shadowsocks",
       tag: "ss-in",
@@ -77,9 +84,9 @@ export function ShadowsocksForm({
     if (ssConfig.multiplex_enabled) {
       previewConfig.multiplex = { enabled: true, padding: ssConfig.multiplex_padding }
     }
-    setInbound(0, previewConfig)
     clearEndpoints()
-  }, [ssConfig])
+    setInbound(0, previewConfig)
+  }, [ssConfig, setInbound, clearEndpoints])
 
   const showShadowsocksQrCode = async () => {
     onError("")
