@@ -33,17 +33,17 @@ export function WireguardForm({
   useEffect(() => {
     if (isInitializedRef.current) return
     const wgEndpoint = initialEndpoint?.type === "wireguard" ? initialEndpoint : null
-    const loadedPeers = ((wgEndpoint?.peers || initialConfig.peers) || []).map((peer: any) => ({
+    const loadedPeers = ((wgEndpoint?.peers || initialConfig?.peers) || []).map((peer: any) => ({
       publicKey: peer.public_key || "",
       privateKey: peer.private_key,
       allowedIPs: peer.allowed_ips || [],
     }))
     setWgConfig({
-      listen_port: wgEndpoint?.listen_port || initialConfig.listen_port || 5353,
-      local_address: (wgEndpoint?.address?.[0] || initialConfig.address?.[0]) || "10.10.0.1/32",
-      private_key: wgEndpoint?.private_key || initialConfig.private_key || "",
+      listen_port: wgEndpoint?.listen_port || initialConfig?.listen_port || 5353,
+      local_address: (wgEndpoint?.address?.[0] || initialConfig?.address?.[0]) || "10.10.0.1/32",
+      private_key: wgEndpoint?.private_key || initialConfig?.private_key || "",
       peers: loadedPeers.length > 0 ? loadedPeers : [{ publicKey: "", allowedIPs: ["10.10.0.2/32"] }],
-      mtu: wgEndpoint?.mtu || initialConfig.mtu || 1420,
+      mtu: wgEndpoint?.mtu || initialConfig?.mtu || 1420,
     })
     isInitializedRef.current = true
   }, [initialConfig, initialEndpoint])
