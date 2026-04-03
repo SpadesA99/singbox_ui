@@ -57,3 +57,4 @@ temp/
 .claude/
 .omc/
 dist/certs/
+frontend/next-env.d.ts
