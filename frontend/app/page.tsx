@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { InboundConfig } from "@/components/inbound-config"
+import { InboundConfig } from "@/components/inbound"
 import { OutboundConfig } from "@/components/outbound-config"
 import { RoutingConfig } from "@/components/routing-config"
 import { DnsConfigComponent } from "@/components/dns-config"
