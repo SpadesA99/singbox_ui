@@ -129,6 +129,8 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
     transport_type: "tcp" as string, // "tcp" | "ws" | "grpc" | "http" | "httpupgrade"
     transport_path: "",
     transport_service_name: "",
+    multiplex_enabled: false,
+    multiplex_padding: false,
   })
 
   // TLS 1.3 检测状态
@@ -164,6 +166,9 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
     listen_port: 8388,
     method: "2022-blake3-chacha20-poly1305",
     password: "",
+    users: [] as { name: string; password: string }[],
+    multiplex_enabled: false,
+    multiplex_padding: false,
   })
 
   // Hysteria2 配置 (sing-box 格式)
@@ -179,6 +184,10 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
     tls_acme_domain: "",
     tls_certificate_path: "/etc/sing-box/cert.pem",
     tls_key_path: "/etc/sing-box/key.pem",
+    obfs_type: "",
+    obfs_password: "",
+    masquerade: "",
+    ignore_client_bandwidth: false,
   })
 
   // VMess 配置 (sing-box 格式)
@@ -195,6 +204,8 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
     transport_type: "tcp" as string,
     transport_path: "",
     transport_service_name: "",
+    multiplex_enabled: false,
+    multiplex_padding: false,
   })
 
   // Trojan 配置 (sing-box 格式)
@@ -211,6 +222,10 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
     transport_type: "tcp" as string,
     transport_path: "",
     transport_service_name: "",
+    fallback_server: "",
+    fallback_server_port: 0,
+    multiplex_enabled: false,
+    multiplex_padding: false,
   })
 
   // TUIC 配置 (sing-box 格式)
@@ -236,6 +251,7 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
     tls_acme_domain: "",
     tls_certificate_path: "/etc/sing-box/cert.pem",
     tls_key_path: "/etc/sing-box/key.pem",
+    network: "" as "" | "tcp" | "udp",
   })
 
   // ShadowTLS 配置 (sing-box 格式)
@@ -248,6 +264,8 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
     handshake_server: "www.google.com",
     handshake_server_port: 443,
     strict_mode: true,
+    handshake_for_server_name: {} as Record<string, { server: string; server_port: number }>,
+    wildcard_sni: "off" as "off" | "authed" | "all",
   })
 
   // AnyTLS 配置 (sing-box 格式)
@@ -259,6 +277,7 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
     tls_acme_domain: "",
     tls_certificate_path: "/etc/sing-box/cert.pem",
     tls_key_path: "/etc/sing-box/key.pem",
+    padding_scheme: "",
   })
 
   // 从 initialConfig 初始化表单 - 纯 sing-box 格式
@@ -331,6 +350,8 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
           transport_type: initialConfig.transport?.type || "tcp",
           transport_path: initialConfig.transport?.path || "",
           transport_service_name: initialConfig.transport?.service_name || "",
+          multiplex_enabled: initialConfig.multiplex?.enabled || false,
+          multiplex_padding: initialConfig.multiplex?.padding || false,
         })
         // 异步从私钥派生公钥
         if (initialConfig.tls?.reality?.private_key) {
@@ -378,6 +399,9 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
           listen_port: initialConfig.listen_port || 8388,
           method: initialConfig.method || "2022-blake3-chacha20-poly1305",
           password: initialConfig.password || "",
+          users: (initialConfig.users || []).map((u: any) => ({ name: u.name || "", password: u.password || "" })),
+          multiplex_enabled: initialConfig.multiplex?.enabled || false,
+          multiplex_padding: initialConfig.multiplex?.padding || false,
         })
         break
 
@@ -394,6 +418,10 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
           tls_acme_domain: initialConfig.tls?.acme?.domain?.[0] || "",
           tls_certificate_path: initialConfig.tls?.certificate_path || "/etc/sing-box/cert.pem",
           tls_key_path: initialConfig.tls?.key_path || "/etc/sing-box/key.pem",
+          obfs_type: initialConfig.obfs?.type || "",
+          obfs_password: initialConfig.obfs?.password || "",
+          masquerade: typeof initialConfig.masquerade === "string" ? initialConfig.masquerade : "",
+          ignore_client_bandwidth: initialConfig.ignore_client_bandwidth || false,
         })
         break
 
@@ -416,6 +444,8 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
           transport_type: initialConfig.transport?.type || "tcp",
           transport_path: initialConfig.transport?.path || "",
           transport_service_name: initialConfig.transport?.service_name || "",
+          multiplex_enabled: initialConfig.multiplex?.enabled || false,
+          multiplex_padding: initialConfig.multiplex?.padding || false,
         })
         break
 
@@ -437,6 +467,10 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
           transport_type: initialConfig.transport?.type || "tcp",
           transport_path: initialConfig.transport?.path || "",
           transport_service_name: initialConfig.transport?.service_name || "",
+          fallback_server: initialConfig.fallback?.server || "",
+          fallback_server_port: initialConfig.fallback?.server_port || 0,
+          multiplex_enabled: initialConfig.multiplex?.enabled || false,
+          multiplex_padding: initialConfig.multiplex?.padding || false,
         })
         break
 
@@ -473,6 +507,7 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
           tls_acme_domain: initialConfig.tls?.acme?.domain?.[0] || "",
           tls_certificate_path: initialConfig.tls?.certificate_path || "/etc/sing-box/cert.pem",
           tls_key_path: initialConfig.tls?.key_path || "/etc/sing-box/key.pem",
+          network: (typeof initialConfig.network === "string" ? initialConfig.network : "") as "" | "tcp" | "udp",
         })
         break
 
@@ -490,6 +525,15 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
           handshake_server: initialConfig.handshake?.server || "www.google.com",
           handshake_server_port: initialConfig.handshake?.server_port || 443,
           strict_mode: initialConfig.strict_mode !== false,
+          handshake_for_server_name: (() => {
+            const raw = initialConfig.handshake_for_server_name || {}
+            const result: Record<string, { server: string; server_port: number }> = {}
+            for (const [sni, config] of Object.entries(raw)) {
+              result[sni] = { server: (config as any).server || "", server_port: (config as any).server_port || 443 }
+            }
+            return result
+          })(),
+          wildcard_sni: (initialConfig.wildcard_sni || "off") as "off" | "authed" | "all",
         })
         break
 
@@ -506,6 +550,7 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
           tls_acme_domain: initialConfig.tls?.acme?.domain?.[0] || "",
           tls_certificate_path: initialConfig.tls?.certificate_path || "/etc/sing-box/cert.pem",
           tls_key_path: initialConfig.tls?.key_path || "/etc/sing-box/key.pem",
+          padding_scheme: (initialConfig.padding_scheme || []).join("\n"),
         })
         break
     }
@@ -609,6 +654,9 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
             previewConfig.transport.service_name = vlessConfig.transport_service_name
           }
         }
+        if (vlessConfig.multiplex_enabled) {
+          previewConfig.multiplex = { enabled: true, padding: vlessConfig.multiplex_padding }
+        }
         break
 
       case "wireguard":
@@ -668,6 +716,16 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
           method: ssConfig.method,
           password: ssConfig.password,
         }
+        if (ssConfig.users.length > 0) {
+          previewConfig.users = ssConfig.users.filter((u: { name: string; password: string }) => u.password).map((u: { name: string; password: string }) => {
+            const user: any = { password: u.password }
+            if (u.name) user.name = u.name
+            return user
+          })
+        }
+        if (ssConfig.multiplex_enabled) {
+          previewConfig.multiplex = { enabled: true, padding: ssConfig.multiplex_padding }
+        }
         break
 
       case "hysteria2":
@@ -696,6 +754,15 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
             certificate_path: hy2Config.tls_certificate_path,
             key_path: hy2Config.tls_key_path,
           },
+        }
+        if (hy2Config.obfs_type && hy2Config.obfs_password) {
+          previewConfig.obfs = { type: hy2Config.obfs_type, password: hy2Config.obfs_password }
+        }
+        if (hy2Config.masquerade) {
+          previewConfig.masquerade = hy2Config.masquerade
+        }
+        if (hy2Config.ignore_client_bandwidth) {
+          previewConfig.ignore_client_bandwidth = true
         }
         break
 
@@ -748,6 +815,9 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
             previewConfig.transport.path = vmessConfig.transport_path
           }
         }
+        if (vmessConfig.multiplex_enabled) {
+          previewConfig.multiplex = { enabled: true, padding: vmessConfig.multiplex_padding }
+        }
         break
 
       case "trojan":
@@ -794,6 +864,15 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
           if (trojanConfig.transport_type === "grpc" && trojanConfig.transport_service_name) {
             previewConfig.transport.service_name = trojanConfig.transport_service_name
           }
+          if ((trojanConfig.transport_type === "http" || trojanConfig.transport_type === "httpupgrade") && trojanConfig.transport_path) {
+            previewConfig.transport.path = trojanConfig.transport_path
+          }
+        }
+        if (trojanConfig.fallback_server && trojanConfig.fallback_server_port > 0) {
+          previewConfig.fallback = { server: trojanConfig.fallback_server, server_port: trojanConfig.fallback_server_port }
+        }
+        if (trojanConfig.multiplex_enabled) {
+          previewConfig.multiplex = { enabled: true, padding: trojanConfig.multiplex_padding }
         }
         break
 
@@ -857,6 +936,9 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
             key_path: naiveConfig.tls_key_path,
           },
         }
+        if (naiveConfig.network) {
+          previewConfig.network = naiveConfig.network
+        }
         break
 
       case "shadowtls":
@@ -887,6 +969,23 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
           previewConfig.users = shadowtlsUsersPreview
           previewConfig.strict_mode = shadowtlsConfig.strict_mode
         }
+        if (shadowtlsConfig.version >= 3 && shadowtlsConfig.wildcard_sni && shadowtlsConfig.wildcard_sni !== "off") {
+          previewConfig.wildcard_sni = shadowtlsConfig.wildcard_sni
+        }
+        if (shadowtlsConfig.version >= 2) {
+          const sniMap = shadowtlsConfig.handshake_for_server_name
+          const filteredSniMap: any = {}
+          let hasSni = false
+          for (const [sni, config] of Object.entries(sniMap)) {
+            if (sni && config.server) {
+              filteredSniMap[sni] = { server: config.server, server_port: config.server_port || 443 }
+              hasSni = true
+            }
+          }
+          if (hasSni) {
+            previewConfig.handshake_for_server_name = filteredSniMap
+          }
+        }
         break
 
       case "anytls":
@@ -915,6 +1014,9 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
             certificate_path: anytlsConfig.tls_certificate_path,
             key_path: anytlsConfig.tls_key_path,
           },
+        }
+        if (anytlsConfig.padding_scheme.trim()) {
+          previewConfig.padding_scheme = anytlsConfig.padding_scheme.split("\n").filter((l: string) => l.trim())
         }
         break
     }
@@ -2035,6 +2137,31 @@ PersistentKeepalive = 25`
               </div>
             )}
           </div>
+          {/* Multiplex */}
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="vless-multiplex"
+                checked={vlessConfig.multiplex_enabled}
+                onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_enabled: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="vless-multiplex">{t("multiplexEnabled")}</Label>
+            </div>
+            {vlessConfig.multiplex_enabled && (
+              <div className="flex items-center space-x-2 ml-6">
+                <input
+                  type="checkbox"
+                  id="vless-multiplex-padding"
+                  checked={vlessConfig.multiplex_padding}
+                  onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_padding: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="vless-multiplex-padding">{t("multiplexPadding")}</Label>
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         {/* WireGuard 配置 */}
@@ -2254,6 +2381,78 @@ PersistentKeepalive = 25`
               </p>
             )}
           </div>
+          {/* 多用户 */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>{t("ssMultiUser")}</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSsConfig({ ...ssConfig, users: [...ssConfig.users, { name: "", password: "" }] })}
+              >
+                <Plus className="h-4 w-4 mr-1" /> {t("addUser")}
+              </Button>
+            </div>
+            {ssConfig.users.map((user, index) => (
+              <div key={index} className="flex gap-2 items-center">
+                <Input
+                  value={user.name}
+                  onChange={(e) => {
+                    const newUsers = [...ssConfig.users]
+                    newUsers[index] = { ...newUsers[index], name: e.target.value }
+                    setSsConfig({ ...ssConfig, users: newUsers })
+                  }}
+                  placeholder={t("userName")}
+                  className="flex-1"
+                />
+                <Input
+                  value={user.password}
+                  onChange={(e) => {
+                    const newUsers = [...ssConfig.users]
+                    newUsers[index] = { ...newUsers[index], password: e.target.value }
+                    setSsConfig({ ...ssConfig, users: newUsers })
+                  }}
+                  placeholder={tc("password")}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSsConfig({ ...ssConfig, users: ssConfig.users.filter((_, i) => i !== index) })}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <p className="text-xs text-muted-foreground">{t("ssMultiUserHint")}</p>
+          </div>
+          {/* Multiplex */}
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="ss-multiplex"
+                checked={ssConfig.multiplex_enabled}
+                onChange={(e) => setSsConfig({ ...ssConfig, multiplex_enabled: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="ss-multiplex">{t("multiplexEnabled")}</Label>
+            </div>
+            {ssConfig.multiplex_enabled && (
+              <div className="flex items-center space-x-2 ml-6">
+                <input
+                  type="checkbox"
+                  id="ss-multiplex-padding"
+                  checked={ssConfig.multiplex_padding}
+                  onChange={(e) => setSsConfig({ ...ssConfig, multiplex_padding: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="ss-multiplex-padding">{t("multiplexPadding")}</Label>
+              </div>
+            )}
+          </div>
           <div className="pt-2">
             <Button type="button" variant="outline" onClick={showShadowsocksQrCode} disabled={!ssConfig.password}>
               <QrCode className="h-4 w-4 mr-1" />
@@ -2415,6 +2614,47 @@ PersistentKeepalive = 25`
               placeholder="h3, h3-29"
             />
             <p className="text-xs text-muted-foreground">{t("alpnHint")}</p>
+          </div>
+          {/* 混淆 (Obfuscation) */}
+          <div className="space-y-2">
+            <Label>{t("hy2Obfs")}</Label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={hy2Config.obfs_type}
+              onChange={(e) => setHy2Config({ ...hy2Config, obfs_type: e.target.value })}
+            >
+              <option value="">{t("disabled")}</option>
+              <option value="salamander">Salamander</option>
+            </select>
+          </div>
+          {hy2Config.obfs_type && (
+            <div className="space-y-2">
+              <Label>{t("hy2ObfsPassword")}</Label>
+              <Input
+                value={hy2Config.obfs_password}
+                onChange={(e) => setHy2Config({ ...hy2Config, obfs_password: e.target.value })}
+                placeholder={t("hy2ObfsPasswordHint")}
+              />
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label>{t("hy2Masquerade")}</Label>
+            <Input
+              value={hy2Config.masquerade}
+              onChange={(e) => setHy2Config({ ...hy2Config, masquerade: e.target.value })}
+              placeholder="https://example.com"
+            />
+            <p className="text-xs text-muted-foreground">{t("hy2MasqueradeHint")}</p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="hy2-ignore-bw"
+              checked={hy2Config.ignore_client_bandwidth}
+              onChange={(e) => setHy2Config({ ...hy2Config, ignore_client_bandwidth: e.target.checked })}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <Label htmlFor="hy2-ignore-bw">{t("hy2IgnoreClientBandwidth")}</Label>
           </div>
           <div className="pt-2">
             <Button type="button" variant="outline" onClick={showHysteria2QrCode} disabled={!hy2Config.password}>
@@ -2670,6 +2910,31 @@ PersistentKeepalive = 25`
               </div>
             )}
           </div>
+          {/* Multiplex */}
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="vmess-multiplex"
+                checked={vmessConfig.multiplex_enabled}
+                onChange={(e) => setVmessConfig({ ...vmessConfig, multiplex_enabled: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="vmess-multiplex">{t("multiplexEnabled")}</Label>
+            </div>
+            {vmessConfig.multiplex_enabled && (
+              <div className="flex items-center space-x-2 ml-6">
+                <input
+                  type="checkbox"
+                  id="vmess-multiplex-padding"
+                  checked={vmessConfig.multiplex_padding}
+                  onChange={(e) => setVmessConfig({ ...vmessConfig, multiplex_padding: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="vmess-multiplex-padding">{t("multiplexPadding")}</Label>
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         {/* Trojan 配置 */}
@@ -2879,6 +3144,8 @@ PersistentKeepalive = 25`
               <option value="tcp">{t("tcpDefault")}</option>
               <option value="ws">WebSocket</option>
               <option value="grpc">gRPC</option>
+              <option value="http">HTTP/2</option>
+              <option value="httpupgrade">HTTP Upgrade</option>
             </select>
             {trojanConfig.transport_type !== "tcp" && (
               <div className="space-y-2 pt-2">
@@ -2901,6 +3168,51 @@ PersistentKeepalive = 25`
                     />
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+          {/* Fallback */}
+          <div className="space-y-2">
+            <Label>{t("trojanFallback")}</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                value={trojanConfig.fallback_server}
+                onChange={(e) => setTrojanConfig({ ...trojanConfig, fallback_server: e.target.value })}
+                placeholder="127.0.0.1"
+              />
+              <Input
+                type="number"
+                min="0"
+                max="65535"
+                value={trojanConfig.fallback_server_port || ""}
+                onChange={(e) => setTrojanConfig({ ...trojanConfig, fallback_server_port: parseInt(e.target.value) || 0 })}
+                placeholder={tc("port")}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">{t("trojanFallbackHint")}</p>
+          </div>
+          {/* Multiplex */}
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="trojan-multiplex"
+                checked={trojanConfig.multiplex_enabled}
+                onChange={(e) => setTrojanConfig({ ...trojanConfig, multiplex_enabled: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="trojan-multiplex">{t("multiplexEnabled")}</Label>
+            </div>
+            {trojanConfig.multiplex_enabled && (
+              <div className="flex items-center space-x-2 ml-6">
+                <input
+                  type="checkbox"
+                  id="trojan-multiplex-padding"
+                  checked={trojanConfig.multiplex_padding}
+                  onChange={(e) => setTrojanConfig({ ...trojanConfig, multiplex_padding: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="trojan-multiplex-padding">{t("multiplexPadding")}</Label>
               </div>
             )}
           </div>
@@ -3228,6 +3540,19 @@ PersistentKeepalive = 25`
             ))}
           </div>
 
+          <div className="space-y-2">
+            <Label>{t("naiveNetwork")}</Label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={naiveConfig.network}
+              onChange={(e) => setNaiveConfig({ ...naiveConfig, network: e.target.value as "" | "tcp" | "udp" })}
+            >
+              <option value="">{t("networkBoth")}</option>
+              <option value="tcp">TCP</option>
+              <option value="udp">UDP</option>
+            </select>
+          </div>
+
           {/* TLS 配置 */}
           <div className="space-y-2 border-t pt-4">
             <div className="flex items-center justify-between">
@@ -3395,6 +3720,22 @@ PersistentKeepalive = 25`
                 className="h-4 w-4"
               />
               <Label htmlFor="shadowtls-strict-mode">{t("strictMode")}</Label>
+            </div>
+          )}
+
+          {/* Wildcard SNI - v3 only */}
+          {shadowtlsConfig.version >= 3 && (
+            <div className="space-y-2">
+              <Label>{t("shadowtlsWildcardSni")}</Label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={shadowtlsConfig.wildcard_sni}
+                onChange={(e) => setShadowtlsConfig({ ...shadowtlsConfig, wildcard_sni: e.target.value as "off" | "authed" | "all" })}
+              >
+                <option value="off">{t("disabled")}</option>
+                <option value="authed">{t("shadowtlsWildcardAuthed")}</option>
+                <option value="all">{t("shadowtlsWildcardAll")}</option>
+              </select>
             </div>
           )}
 
@@ -3578,6 +3919,18 @@ PersistentKeepalive = 25`
                 </div>
               </Card>
             ))}
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t("anytlsPaddingScheme")}</Label>
+            <textarea
+              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
+              value={anytlsConfig.padding_scheme}
+              onChange={(e) => setAnytlsConfig({ ...anytlsConfig, padding_scheme: e.target.value })}
+              placeholder={"stop=8\n0=30-30\n1=100-400"}
+              rows={4}
+            />
+            <p className="text-xs text-muted-foreground">{t("anytlsPaddingSchemeHint")}</p>
           </div>
 
           {/* TLS 配置 */}

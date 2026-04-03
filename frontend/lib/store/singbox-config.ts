@@ -457,6 +457,14 @@ export interface Inbound {
   version?: number
   handshake?: ShadowTLSHandshake
   strict_mode?: boolean
+  handshake_for_server_name?: Record<string, { server: string; server_port: number }>
+  wildcard_sni?: string
+  // Hysteria2 specific (additional)
+  ignore_client_bandwidth?: boolean
+  // Trojan specific
+  fallback?: { server: string; server_port: number }
+  // AnyTLS specific
+  padding_scheme?: string[]
   // Sniff options (deprecated, use rule action)
   sniff?: boolean
   sniff_override_destination?: boolean
