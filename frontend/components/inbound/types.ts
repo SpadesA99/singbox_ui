@@ -29,6 +29,11 @@ export interface NaiveUser {
   password: string
 }
 
+export interface Hysteria2User {
+  name?: string
+  password: string
+}
+
 export interface ShadowTLSUser {
   name?: string
   password: string
@@ -45,6 +50,7 @@ export interface LocalPeer {
   privateKey?: string
   presharedKey?: string
   allowedIPs: string[]
+  persistentKeepaliveInterval?: string
 }
 
 // QR code types

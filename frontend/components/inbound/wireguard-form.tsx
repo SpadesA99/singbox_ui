@@ -38,6 +38,7 @@ export function WireguardForm({
       privateKey: peer.private_key,
       presharedKey: peer.pre_shared_key || "",
       allowedIPs: peer.allowed_ips || [],
+      persistentKeepaliveInterval: peer.persistent_keepalive_interval || "",
     }))
     setWgConfig({
       listen_port: wgEndpoint?.listen_port || initialConfig?.listen_port || 5353,
@@ -60,6 +61,7 @@ export function WireguardForm({
           allowed_ips: p.allowedIPs,
         }
         if (p.presharedKey) peer.pre_shared_key = p.presharedKey
+        if (p.persistentKeepaliveInterval) peer.persistent_keepalive_interval = p.persistentKeepaliveInterval
         return peer
       })
 
@@ -411,6 +413,18 @@ PersistentKeepalive = 25`
                     setWgConfig({ ...wgConfig, peers: newPeers })
                   }}
                   className="font-mono text-xs"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">{t("persistentKeepalive")}</Label>
+                <Input
+                  placeholder="25s"
+                  value={peer.persistentKeepaliveInterval || ""}
+                  onChange={(e) => {
+                    const newPeers = [...wgConfig.peers]
+                    newPeers[index].persistentKeepaliveInterval = e.target.value
+                    setWgConfig({ ...wgConfig, peers: newPeers })
+                  }}
                 />
               </div>
             </div>

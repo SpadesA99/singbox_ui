@@ -27,6 +27,7 @@ export function ShadowtlsForm({
     users: [{ name: "", password: "" }] as ShadowTLSUser[], // v3 使用 users
     handshake_server: "www.google.com",
     handshake_server_port: 443,
+    handshake_detour: "",
     strict_mode: true,
     handshake_for_server_name: {} as Record<string, { server: string; server_port: number }>,
     wildcard_sni: "off" as "off" | "authed" | "all",
@@ -53,6 +54,7 @@ export function ShadowtlsForm({
       users: shadowtlsUsers.length > 0 ? shadowtlsUsers : [{ name: "", password: "" }],
       handshake_server: initialConfig.handshake?.server || "www.google.com",
       handshake_server_port: initialConfig.handshake?.server_port || 443,
+      handshake_detour: initialConfig.handshake?.detour || "",
       strict_mode: initialConfig.strict_mode !== false,
       handshake_for_server_name: (() => {
         const raw = initialConfig.handshake_for_server_name || {}
@@ -80,6 +82,7 @@ export function ShadowtlsForm({
       handshake: {
         server: shadowtlsConfig.handshake_server,
         server_port: shadowtlsConfig.handshake_server_port,
+        ...(shadowtlsConfig.handshake_detour ? { detour: shadowtlsConfig.handshake_detour } : {}),
       },
     }
     // v2: 使用顶层 password
@@ -182,6 +185,15 @@ export function ShadowtlsForm({
             }}
           />
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>{t("handshakeDetour")}</Label>
+        <Input
+          value={shadowtlsConfig.handshake_detour}
+          onChange={(e) => setShadowtlsConfig({ ...shadowtlsConfig, handshake_detour: e.target.value })}
+          placeholder={t("handshakeDetourHint")}
+        />
       </div>
 
       {shadowtlsConfig.version === 2 && (

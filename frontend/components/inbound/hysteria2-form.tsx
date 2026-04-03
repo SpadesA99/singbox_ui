@@ -4,18 +4,18 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Key, QrCode, Shield, Upload } from "lucide-react"
+import { Plus, Trash2, Key, QrCode, Shield, Upload } from "lucide-react"
+import { Card } from "@/components/ui/card"
 import { isValidPort, parsePort, isValidListenAddress, generateSecureRandomString } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n"
-import { ProtocolFormProps, formatListen, parseListen } from "./types"
+import { ProtocolFormProps, Hysteria2User, formatListen, parseListen } from "./types"
 
 interface Hysteria2Config {
   listen: string
   listen_port: number
   up_mbps: number
   down_mbps: number
-  user_name: string
-  password: string
+  users: Hysteria2User[]
   tls_alpn: string[]
   tls_mode: "manual" | "acme"
   tls_acme_domain: string
@@ -50,8 +50,7 @@ export function Hysteria2Form({
     listen_port: 443,
     up_mbps: 100,
     down_mbps: 100,
-    user_name: "",
-    password: "",
+    users: [{ name: "", password: "" }],
     tls_alpn: ["h3"],
     tls_mode: "manual",
     tls_acme_domain: "",
@@ -71,13 +70,16 @@ export function Hysteria2Form({
       isInitializedRef.current = true
       return
     }
+    const loadedUsers = (initialConfig.users || []).map((u: any) => ({
+      name: u.name || "",
+      password: u.password || "",
+    }))
     setHy2Config({
       listen: parseListen(initialConfig.listen),
       listen_port: initialConfig.listen_port || 443,
       up_mbps: initialConfig.up_mbps || 100,
       down_mbps: initialConfig.down_mbps || 100,
-      user_name: (initialConfig.users?.[0] as any)?.name || "",
-      password: (initialConfig.users?.[0] as any)?.password || "",
+      users: loadedUsers.length > 0 ? loadedUsers : [{ name: "", password: "" }],
       tls_alpn: initialConfig.tls?.alpn || ["h3"],
       tls_mode: (initialConfig.tls?.acme?.domain?.length ?? 0) > 0 ? "acme" : "manual",
       tls_acme_domain: initialConfig.tls?.acme?.domain?.[0] || "",
@@ -95,10 +97,13 @@ export function Hysteria2Form({
   // Build and push config to store
   useEffect(() => {
     if (!isInitializedRef.current) return
-    const hy2User: any = { password: hy2Config.password }
-    if (hy2Config.user_name) {
-      hy2User.name = hy2Config.user_name
-    }
+    const hy2Users = hy2Config.users
+      .filter((u) => u.password)
+      .map((u) => {
+        const user: any = { password: u.password }
+        if (u.name) user.name = u.name
+        return user
+      })
     const previewConfig: any = {
       type: "hysteria2",
       tag: "hy2-in",
@@ -106,7 +111,7 @@ export function Hysteria2Form({
       listen_port: hy2Config.listen_port,
       up_mbps: hy2Config.up_mbps,
       down_mbps: hy2Config.down_mbps,
-      users: [hy2User],
+      users: hy2Users,
       tls: hy2Config.tls_mode === "acme" && hy2Config.tls_acme_domain ? {
         enabled: true,
         alpn: hy2Config.tls_alpn,
@@ -136,10 +141,11 @@ export function Hysteria2Form({
     setInbound(0, previewConfig)
   }, [hy2Config, setInbound, clearEndpoints])
 
-  const showHysteria2QrCode = async () => {
+  const showHysteria2QrCode = async (userIndex: number) => {
     onError("")
     try {
-      if (!hy2Config.password) {
+      const user = hy2Config.users[userIndex]
+      if (!user || !user.password) {
         throw new Error(t("setPasswordFirst"))
       }
 
@@ -157,14 +163,14 @@ export function Hysteria2Form({
 
       // Hysteria2 URL format: hysteria2://password@host:port/?insecure=1#name
       const params = new URLSearchParams()
-      params.set("insecure", "1") // 自签名证书需要
+      params.set("insecure", "1")
       if (hy2Config.up_mbps) params.set("upmbps", String(hy2Config.up_mbps))
       if (hy2Config.down_mbps) params.set("downmbps", String(hy2Config.down_mbps))
 
-      const name = hy2Config.user_name || "Hysteria2"
-      const hy2Url = `hysteria2://${hy2Config.password}@${ip}:${hy2Config.listen_port}/?${params.toString()}#${encodeURIComponent(name)}`
+      const name = user.name || `Hysteria2-${userIndex + 1}`
+      const hy2Url = `hysteria2://${user.password}@${ip}:${hy2Config.listen_port}/?${params.toString()}#${encodeURIComponent(name)}`
 
-      onShowQrCode(hy2Url, "hysteria2")
+      onShowQrCode(hy2Url, "hysteria2", userIndex)
     } catch (err) {
       onError(err instanceof Error ? err.message : t("generateQrCodeFailed"))
     }
@@ -215,31 +221,89 @@ export function Hysteria2Form({
         </div>
       </div>
       <div className="space-y-2">
-        <Label>{t("usernameOptional")}</Label>
-        <Input
-          value={hy2Config.user_name}
-          onChange={(e) => setHy2Config({ ...hy2Config, user_name: e.target.value })}
-          placeholder={t("identifyUser")}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>{tc("password")}</Label>
-        <div className="flex gap-2">
-          <Input
-            value={hy2Config.password}
-            onChange={(e) => setHy2Config({ ...hy2Config, password: e.target.value })}
-            placeholder={t("enterPassword")}
-            className="flex-1"
-          />
+        <div className="flex items-center justify-between">
+          <Label>{t("users")}</Label>
           <Button
-            type="button"
+            size="sm"
             variant="outline"
-            onClick={() => setHy2Config({ ...hy2Config, password: generateSecureRandomString(16) })}
+            onClick={() =>
+              setHy2Config({
+                ...hy2Config,
+                users: [...hy2Config.users, { name: "", password: "" }],
+              })
+            }
           >
-            <Key className="h-4 w-4 mr-1" />
-            {tc("generate")}
+            <Plus className="h-4 w-4 mr-1" />
+            {tc("add")}
           </Button>
         </div>
+
+        {hy2Config.users.map((user, index) => (
+          <Card key={index} className="p-3">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label className="text-sm">{t("userIndex", { n: index + 1 })}</Label>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => showHysteria2QrCode(index)}
+                    disabled={!user.password}
+                  >
+                    <QrCode className="h-4 w-4" />
+                  </Button>
+                  {hy2Config.users.length > 1 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        setHy2Config({
+                          ...hy2Config,
+                          users: hy2Config.users.filter((_, i) => i !== index),
+                        })
+                      }
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <Input
+                placeholder={t("nameOptional")}
+                value={user.name || ""}
+                onChange={(e) => {
+                  const newUsers = [...hy2Config.users]
+                  newUsers[index] = { ...newUsers[index], name: e.target.value }
+                  setHy2Config({ ...hy2Config, users: newUsers })
+                }}
+              />
+              <div className="flex gap-2">
+                <Input
+                  placeholder={tc("password")}
+                  value={user.password}
+                  onChange={(e) => {
+                    const newUsers = [...hy2Config.users]
+                    newUsers[index] = { ...newUsers[index], password: e.target.value }
+                    setHy2Config({ ...hy2Config, users: newUsers })
+                  }}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const newUsers = [...hy2Config.users]
+                    newUsers[index] = { ...newUsers[index], password: generateSecureRandomString(16) }
+                    setHy2Config({ ...hy2Config, users: newUsers })
+                  }}
+                >
+                  <Key className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </Card>
+        ))}
       </div>
       <div className="space-y-2 border-t pt-4">
         <div className="flex items-center justify-between">
@@ -377,12 +441,6 @@ export function Hysteria2Form({
           className="h-4 w-4 rounded border-gray-300"
         />
         <Label htmlFor="hy2-ignore-bw">{t("hy2IgnoreClientBandwidth")}</Label>
-      </div>
-      <div className="pt-2">
-        <Button type="button" variant="outline" onClick={showHysteria2QrCode} disabled={!hy2Config.password}>
-          <QrCode className="h-4 w-4 mr-1" />
-          {t("generateQrCode")}
-        </Button>
       </div>
     </div>
   )

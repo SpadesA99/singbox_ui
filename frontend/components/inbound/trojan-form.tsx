@@ -43,6 +43,7 @@ export function TrojanForm({
     transport_service_name: "",
     fallback_server: "",
     fallback_server_port: 0,
+    fallback_for_alpn: [] as { alpn: string; server: string; server_port: number }[],
     multiplex_enabled: false,
     multiplex_padding: false,
     multiplex_brutal: false,
@@ -80,6 +81,14 @@ export function TrojanForm({
       transport_service_name: initialConfig.transport?.service_name || "",
       fallback_server: initialConfig.fallback?.server || "",
       fallback_server_port: initialConfig.fallback?.server_port || 0,
+      fallback_for_alpn: (() => {
+        const raw = initialConfig.fallback_for_alpn || {}
+        return Object.entries(raw).map(([alpn, config]: [string, any]) => ({
+          alpn,
+          server: config?.server || "",
+          server_port: config?.server_port || 0,
+        }))
+      })(),
       multiplex_enabled: initialConfig.multiplex?.enabled || false,
       multiplex_padding: initialConfig.multiplex?.padding || false,
       multiplex_brutal: initialConfig.multiplex?.brutal?.enabled || false,
@@ -173,6 +182,15 @@ export function TrojanForm({
         server: trojanConfig.fallback_server,
         server_port: trojanConfig.fallback_server_port,
       }
+    }
+
+    const alpnFallbacks = trojanConfig.fallback_for_alpn.filter((f) => f.alpn && f.server && f.server_port > 0)
+    if (alpnFallbacks.length > 0) {
+      const fallbackMap: Record<string, { server: string; server_port: number }> = {}
+      for (const f of alpnFallbacks) {
+        fallbackMap[f.alpn] = { server: f.server, server_port: f.server_port }
+      }
+      previewConfig.fallback_for_alpn = fallbackMap
     }
 
     if (trojanConfig.multiplex_enabled) {
@@ -527,6 +545,76 @@ export function TrojanForm({
           />
         </div>
         <p className="text-xs text-muted-foreground">{t("trojanFallbackHint")}</p>
+      </div>
+
+      {/* Fallback for ALPN */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>{t("trojanFallbackForAlpn")}</Label>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              setTrojanConfig({
+                ...trojanConfig,
+                fallback_for_alpn: [...trojanConfig.fallback_for_alpn, { alpn: "", server: "", server_port: 0 }],
+              })
+            }
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            {tc("add")}
+          </Button>
+        </div>
+        {trojanConfig.fallback_for_alpn.map((entry, index) => (
+          <div key={index} className="flex gap-2 items-center">
+            <Input
+              placeholder="ALPN (h2, http/1.1)"
+              value={entry.alpn}
+              onChange={(e) => {
+                const newEntries = [...trojanConfig.fallback_for_alpn]
+                newEntries[index] = { ...newEntries[index], alpn: e.target.value }
+                setTrojanConfig({ ...trojanConfig, fallback_for_alpn: newEntries })
+              }}
+              className="w-32"
+            />
+            <Input
+              placeholder="127.0.0.1"
+              value={entry.server}
+              onChange={(e) => {
+                const newEntries = [...trojanConfig.fallback_for_alpn]
+                newEntries[index] = { ...newEntries[index], server: e.target.value }
+                setTrojanConfig({ ...trojanConfig, fallback_for_alpn: newEntries })
+              }}
+              className="flex-1"
+            />
+            <Input
+              type="number"
+              min="0"
+              max="65535"
+              placeholder={tc("port")}
+              value={entry.server_port || ""}
+              onChange={(e) => {
+                const newEntries = [...trojanConfig.fallback_for_alpn]
+                newEntries[index] = { ...newEntries[index], server_port: parseInt(e.target.value) || 0 }
+                setTrojanConfig({ ...trojanConfig, fallback_for_alpn: newEntries })
+              }}
+              className="w-24"
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                setTrojanConfig({
+                  ...trojanConfig,
+                  fallback_for_alpn: trojanConfig.fallback_for_alpn.filter((_, i) => i !== index),
+                })
+              }
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+        <p className="text-xs text-muted-foreground">{t("trojanFallbackForAlpnHint")}</p>
       </div>
 
       {/* Multiplex */}

@@ -130,7 +130,7 @@ export function VmessForm({
       .map((u) => {
         const user: any = { uuid: u.uuid }
         if (u.name) user.name = u.name
-        if (u.alterId) user.alter_id = u.alterId
+        if (u.alterId) user.alterId = u.alterId
         return user
       })
 

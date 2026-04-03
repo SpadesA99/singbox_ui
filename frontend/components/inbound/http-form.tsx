@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Key, Shield } from "lucide-react"
+import { Plus, Trash2, Key, Shield } from "lucide-react"
+import { Card } from "@/components/ui/card"
 import { isValidPort, parsePort, isValidListenAddress, generateSecureRandomString } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n"
 import { ProtocolFormProps, formatListen, parseListen } from "./types"
@@ -18,8 +19,7 @@ export function HttpForm({ initialConfig, setInbound, clearEndpoints, onError, c
     listen: "0.0.0.0",
     listen_port: 8080,
     auth: "none" as "none" | "password",
-    username: "",
-    password: "",
+    users: [{ username: "", password: "" }] as { username: string; password: string }[],
     tls_enabled: false,
     tls_mode: "manual" as "manual" | "acme",
     tls_acme_domain: "",
@@ -34,12 +34,15 @@ export function HttpForm({ initialConfig, setInbound, clearEndpoints, onError, c
       isInitializedRef.current = true
       return
     }
+    const loadedUsers = (initialConfig.users || []).map((u: any) => ({
+      username: u.username || u.Username || "",
+      password: u.password || u.Password || "",
+    }))
     setConfig({
       listen: parseListen(initialConfig.listen),
       listen_port: initialConfig.listen_port || 8080,
-      auth: (initialConfig.users?.length ?? 0) > 0 ? "password" : "none",
-      username: (initialConfig.users?.[0] as any)?.username || "",
-      password: (initialConfig.users?.[0] as any)?.password || "",
+      auth: loadedUsers.length > 0 ? "password" : "none",
+      users: loadedUsers.length > 0 ? loadedUsers : [{ username: "", password: "" }],
       tls_enabled: initialConfig.tls?.enabled || false,
       tls_mode: (initialConfig.tls?.acme?.domain?.length ?? 0) > 0 ? "acme" : "manual",
       tls_acme_domain: initialConfig.tls?.acme?.domain?.[0] || "",
@@ -59,13 +62,11 @@ export function HttpForm({ initialConfig, setInbound, clearEndpoints, onError, c
       listen: formatListen(config.listen),
       listen_port: config.listen_port,
     }
-    if (config.auth === "password" && config.username && config.password) {
-      previewConfig.users = [
-        {
-          username: config.username,
-          password: config.password,
-        },
-      ]
+    if (config.auth === "password") {
+      const validUsers = config.users.filter((u) => u.username && u.password)
+      if (validUsers.length > 0) {
+        previewConfig.users = validUsers.map((u) => ({ username: u.username, password: u.password }))
+      }
     }
     if (config.tls_enabled) {
       if (config.tls_mode === "acme" && config.tls_acme_domain) {
@@ -135,41 +136,83 @@ export function HttpForm({ initialConfig, setInbound, clearEndpoints, onError, c
         </select>
       </div>
       {config.auth === "password" && (
-        <>
-          <div className="space-y-2">
-            <Label>{tc("username")}</Label>
-            <Input
-              value={config.username}
-              onChange={(e) => setConfig({ ...config, username: e.target.value })}
-              placeholder={t("enterUsername")}
-            />
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>{t("users")}</Label>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                setConfig({
+                  ...config,
+                  users: [...config.users, { username: "", password: "" }],
+                })
+              }
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              {tc("add")}
+            </Button>
           </div>
-          <div className="space-y-2">
-            <Label>{tc("password")}</Label>
-            <div className="flex gap-2">
-              <Input
-                value={config.password}
-                onChange={(e) => setConfig({ ...config, password: e.target.value })}
-                placeholder={t("enterPassword")}
-                className="flex-1"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  setConfig({
-                    ...config,
-                    username: generateSecureRandomString(8),
-                    password: generateSecureRandomString(16),
-                  })
-                }
-              >
-                <Key className="h-4 w-4 mr-1" />
-                {tc("generate")}
-              </Button>
-            </div>
-          </div>
-        </>
+          {config.users.map((user, index) => (
+            <Card key={index} className="p-3">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Label className="text-sm">{t("userIndex", { n: index + 1 })}</Label>
+                  {config.users.length > 1 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        setConfig({
+                          ...config,
+                          users: config.users.filter((_, i) => i !== index),
+                        })
+                      }
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <Input
+                  placeholder={tc("username")}
+                  value={user.username}
+                  onChange={(e) => {
+                    const newUsers = [...config.users]
+                    newUsers[index] = { ...newUsers[index], username: e.target.value }
+                    setConfig({ ...config, users: newUsers })
+                  }}
+                />
+                <div className="flex gap-2">
+                  <Input
+                    placeholder={tc("password")}
+                    value={user.password}
+                    onChange={(e) => {
+                      const newUsers = [...config.users]
+                      newUsers[index] = { ...newUsers[index], password: e.target.value }
+                      setConfig({ ...config, users: newUsers })
+                    }}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const newUsers = [...config.users]
+                      newUsers[index] = {
+                        username: newUsers[index].username || generateSecureRandomString(8),
+                        password: generateSecureRandomString(16),
+                      }
+                      setConfig({ ...config, users: newUsers })
+                    }}
+                  >
+                    <Key className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
       )}
 
       {/* TLS 配置 */}
