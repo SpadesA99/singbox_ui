@@ -35,6 +35,8 @@ export function TuicForm({
     tls_acme_domain: "",
     tls_certificate_path: "/etc/sing-box/cert.pem",
     tls_key_path: "/etc/sing-box/key.pem",
+    auth_timeout: "",
+    heartbeat: "",
   })
 
   const [initialized, setInitialized] = useState(false)
@@ -62,6 +64,8 @@ export function TuicForm({
       tls_acme_domain: initialConfig.tls?.acme?.domain?.[0] || "",
       tls_certificate_path: initialConfig.tls?.certificate_path || "/etc/sing-box/cert.pem",
       tls_key_path: initialConfig.tls?.key_path || "/etc/sing-box/key.pem",
+      auth_timeout: initialConfig.auth_timeout || "",
+      heartbeat: initialConfig.heartbeat || "",
     })
     setInitialized(true)
   }, [initialConfig, initialized])
@@ -100,6 +104,13 @@ export function TuicForm({
         certificate_path: tuicConfig.tls_certificate_path,
         key_path: tuicConfig.tls_key_path,
       },
+    }
+
+    if (tuicConfig.auth_timeout) {
+      previewConfig.auth_timeout = tuicConfig.auth_timeout
+    }
+    if (tuicConfig.heartbeat) {
+      previewConfig.heartbeat = tuicConfig.heartbeat
     }
 
     clearEndpoints()
@@ -179,6 +190,17 @@ export function TuicForm({
           <option value="new_reno">New Reno</option>
           <option value="bbr">BBR</option>
         </select>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="tuic-zero-rtt"
+          checked={tuicConfig.zero_rtt_handshake}
+          onChange={(e) => setTuicConfig({ ...tuicConfig, zero_rtt_handshake: e.target.checked })}
+          className="h-4 w-4"
+        />
+        <Label htmlFor="tuic-zero-rtt">{t("zeroRttHandshake")}</Label>
       </div>
 
       <div className="space-y-2">
@@ -348,6 +370,24 @@ export function TuicForm({
             </div>
           </>
         )}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>{t("authTimeout")}</Label>
+            <Input
+              value={tuicConfig.auth_timeout}
+              onChange={(e) => setTuicConfig({ ...tuicConfig, auth_timeout: e.target.value })}
+              placeholder="3s"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>{t("heartbeat")}</Label>
+            <Input
+              value={tuicConfig.heartbeat}
+              onChange={(e) => setTuicConfig({ ...tuicConfig, heartbeat: e.target.value })}
+              placeholder="10s"
+            />
+          </div>
+        </div>
         <div className="space-y-2">
           <Label>{t("alpnProtocol")}</Label>
           <Input

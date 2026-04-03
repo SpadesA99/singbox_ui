@@ -17,6 +17,8 @@ export function SocksForm({ initialConfig, setOutbound }: OutboundFormProps) {
     version: "5",
     username: "",
     password: "",
+    network: "",
+    udp_over_tcp: false,
   })
 
   useEffect(() => {
@@ -28,6 +30,8 @@ export function SocksForm({ initialConfig, setOutbound }: OutboundFormProps) {
         version: initialConfig.version || "5",
         username: initialConfig.username || "",
         password: initialConfig.password || "",
+        network: (typeof initialConfig.network === "string" ? initialConfig.network : "") as "" | "tcp" | "udp",
+        udp_over_tcp: initialConfig.udp_over_tcp?.enabled || false,
       })
     }
     isInitializedRef.current = true
@@ -46,9 +50,17 @@ export function SocksForm({ initialConfig, setOutbound }: OutboundFormProps) {
     if (socksConfig.version && socksConfig.version !== "5") {
       previewConfig.version = socksConfig.version
     }
-    if (socksConfig.username && socksConfig.password) {
+    if (socksConfig.username) {
       previewConfig.username = socksConfig.username
+    }
+    if (socksConfig.password) {
       previewConfig.password = socksConfig.password
+    }
+    if (socksConfig.network) {
+      previewConfig.network = socksConfig.network
+    }
+    if (socksConfig.udp_over_tcp) {
+      previewConfig.udp_over_tcp = { enabled: true }
     }
 
     setOutbound(0, previewConfig)
@@ -101,6 +113,35 @@ export function SocksForm({ initialConfig, setOutbound }: OutboundFormProps) {
             value={socksConfig.password}
             onChange={(e) => setSocksConfig({ ...socksConfig, password: e.target.value })}
           />
+        </div>
+      </div>
+
+      {/* Network & UDP over TCP */}
+      <div className="border-t pt-4 mt-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>{t("networkProtocol")}</Label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={socksConfig.network}
+              onChange={(e) => setSocksConfig({ ...socksConfig, network: e.target.value })}
+            >
+              <option value="">{t("allDefault")}</option>
+              <option value="tcp">{t("tcpOnly")}</option>
+              <option value="udp">{t("udpOnly")}</option>
+            </select>
+          </div>
+          <div className="space-y-2 flex items-end">
+            <label className="flex items-center gap-2 text-sm pb-2">
+              <input
+                type="checkbox"
+                checked={socksConfig.udp_over_tcp}
+                onChange={(e) => setSocksConfig({ ...socksConfig, udp_over_tcp: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              {t("enableUdpOverTcp")}
+            </label>
+          </div>
         </div>
       </div>
     </div>

@@ -4,12 +4,12 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Key, QrCode } from "lucide-react"
+import { Key, QrCode, Shield } from "lucide-react"
 import { isValidPort, parsePort, isValidListenAddress, generateSecureRandomString } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n"
 import { ProtocolFormProps, formatListen, parseListen, getPublicIP } from "./types"
 
-export function MixedForm({ initialConfig, setInbound, clearEndpoints, onError, onShowQrCode, serverIP, setServerIP }: ProtocolFormProps) {
+export function MixedForm({ initialConfig, setInbound, clearEndpoints, onError, onShowQrCode, serverIP, setServerIP, certLoading, certInfo, onGenerateCert }: ProtocolFormProps) {
   const { t } = useTranslation("inbound")
   const { t: tc } = useTranslation("common")
   const isInitializedRef = useRef(false)
@@ -20,6 +20,11 @@ export function MixedForm({ initialConfig, setInbound, clearEndpoints, onError, 
     auth: "none" as "none" | "password",
     username: "",
     password: "",
+    tls_enabled: false,
+    tls_mode: "manual" as "manual" | "acme",
+    tls_acme_domain: "",
+    tls_certificate_path: "/etc/sing-box/cert.pem",
+    tls_key_path: "/etc/sing-box/key.pem",
   })
 
   // Loading useEffect
@@ -35,6 +40,11 @@ export function MixedForm({ initialConfig, setInbound, clearEndpoints, onError, 
       auth: (initialConfig.users?.length ?? 0) > 0 ? "password" : "none",
       username: (initialConfig.users?.[0] as any)?.username || "",
       password: (initialConfig.users?.[0] as any)?.password || "",
+      tls_enabled: initialConfig.tls?.enabled || false,
+      tls_mode: (initialConfig.tls?.acme?.domain?.length ?? 0) > 0 ? "acme" : "manual",
+      tls_acme_domain: initialConfig.tls?.acme?.domain?.[0] || "",
+      tls_certificate_path: initialConfig.tls?.certificate_path || "/etc/sing-box/cert.pem",
+      tls_key_path: initialConfig.tls?.key_path || "/etc/sing-box/key.pem",
     })
     isInitializedRef.current = true
   }, [initialConfig])
@@ -56,6 +66,23 @@ export function MixedForm({ initialConfig, setInbound, clearEndpoints, onError, 
           password: config.password,
         },
       ]
+    }
+    if (config.tls_enabled) {
+      if (config.tls_mode === "acme" && config.tls_acme_domain) {
+        previewConfig.tls = {
+          enabled: true,
+          acme: {
+            domain: [config.tls_acme_domain],
+            data_directory: "/var/lib/sing-box/acme",
+          },
+        }
+      } else {
+        previewConfig.tls = {
+          enabled: true,
+          certificate_path: config.tls_certificate_path,
+          key_path: config.tls_key_path,
+        }
+      }
     }
 
     clearEndpoints()
@@ -158,6 +185,81 @@ export function MixedForm({ initialConfig, setInbound, clearEndpoints, onError, 
           </div>
         </>
       )}
+      {/* TLS */}
+      <div className="space-y-2 border-t pt-4">
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="mixed-tls-enabled"
+            checked={config.tls_enabled}
+            onChange={(e) => setConfig({ ...config, tls_enabled: e.target.checked })}
+            className="h-4 w-4"
+          />
+          <Label htmlFor="mixed-tls-enabled">{t("enableTlsHttps")}</Label>
+        </div>
+        {config.tls_enabled && (
+          <div className="space-y-2 pl-6">
+            <div className="flex gap-2 items-center">
+              <select
+                value={config.tls_mode}
+                onChange={(e) => setConfig({ ...config, tls_mode: e.target.value as "manual" | "acme" })}
+                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+              >
+                <option value="manual">{t("manualConfig")}</option>
+                <option value="acme">{t("acmeAuto")}</option>
+              </select>
+              {config.tls_mode === "manual" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onGenerateCert()}
+                  disabled={certLoading}
+                >
+                  <Shield className="h-4 w-4 mr-1" />
+                  {certLoading ? t("generating") : t("generateSelfSignedCert")}
+                </Button>
+              )}
+              {certInfo && config.tls_mode === "manual" && (
+                <span className="text-xs text-muted-foreground self-center">
+                  {t("certGenerated", { name: certInfo.common_name ?? "", validTo: certInfo.valid_to ?? "" })}
+                </span>
+              )}
+            </div>
+            {config.tls_mode === "acme" ? (
+              <div className="space-y-2">
+                <Label>{t("acmeDomain")}</Label>
+                <Input
+                  value={config.tls_acme_domain}
+                  onChange={(e) => setConfig({ ...config, tls_acme_domain: e.target.value })}
+                  placeholder="example.com"
+                />
+                <p className="text-xs text-muted-foreground">{t("acmeHint")}</p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label>{t("certPath")}</Label>
+                  <Input
+                    value={config.tls_certificate_path}
+                    onChange={(e) => setConfig({ ...config, tls_certificate_path: e.target.value })}
+                    placeholder="/etc/sing-box/cert.pem"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("keyPath")}</Label>
+                  <Input
+                    value={config.tls_key_path}
+                    onChange={(e) => setConfig({ ...config, tls_key_path: e.target.value })}
+                    placeholder="/etc/sing-box/key.pem"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="pt-2">
         <Button type="button" variant="outline" onClick={showQrCode}>
           <QrCode className="h-4 w-4 mr-1" />

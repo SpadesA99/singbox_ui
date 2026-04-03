@@ -20,6 +20,7 @@ export function HttpForm({ initialConfig, setOutbound }: OutboundFormProps) {
     tls_enabled: false,
     tls_server_name: "",
     tls_insecure: false,
+    headers: "",
   })
 
   useEffect(() => {
@@ -34,6 +35,7 @@ export function HttpForm({ initialConfig, setOutbound }: OutboundFormProps) {
         tls_enabled: initialConfig.tls?.enabled || false,
         tls_server_name: initialConfig.tls?.server_name || "",
         tls_insecure: initialConfig.tls?.insecure || false,
+        headers: initialConfig.headers ? Object.entries(initialConfig.headers).map(([k, v]) => `${k}: ${Array.isArray(v) ? v[0] : v}`).join("\n") : "",
       })
     }
     isInitializedRef.current = true
@@ -49,12 +51,28 @@ export function HttpForm({ initialConfig, setOutbound }: OutboundFormProps) {
       server: httpConfig.server,
       server_port: httpConfig.server_port,
     }
-    if (httpConfig.username && httpConfig.password) {
+    if (httpConfig.username) {
       previewConfig.username = httpConfig.username
+    }
+    if (httpConfig.password) {
       previewConfig.password = httpConfig.password
     }
     if (httpConfig.path) {
       previewConfig.path = httpConfig.path
+    }
+    if (httpConfig.headers) {
+      const headersMap: any = {}
+      httpConfig.headers.split("\n").forEach((line: string) => {
+        const idx = line.indexOf(":")
+        if (idx > 0) {
+          const key = line.slice(0, idx).trim()
+          const val = line.slice(idx + 1).trim()
+          if (key && val) headersMap[key] = [val]
+        }
+      })
+      if (Object.keys(headersMap).length > 0) {
+        previewConfig.headers = headersMap
+      }
     }
     if (httpConfig.tls_enabled) {
       const httpTlsConfig: any = { enabled: true }
@@ -113,6 +131,17 @@ export function HttpForm({ initialConfig, setOutbound }: OutboundFormProps) {
           placeholder="/"
           value={httpConfig.path}
           onChange={(e) => setHttpConfig({ ...httpConfig, path: e.target.value })}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>{t("customHeaders")}</Label>
+        <textarea
+          className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
+          rows={3}
+          value={httpConfig.headers}
+          onChange={(e) => setHttpConfig({ ...httpConfig, headers: e.target.value })}
+          placeholder={t("customHeadersHint")}
         />
       </div>
 

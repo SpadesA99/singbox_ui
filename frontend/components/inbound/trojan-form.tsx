@@ -45,6 +45,13 @@ export function TrojanForm({
     fallback_server_port: 0,
     multiplex_enabled: false,
     multiplex_padding: false,
+    multiplex_brutal: false,
+    multiplex_brutal_up: 0,
+    multiplex_brutal_down: 0,
+    tls_alpn: "",
+    transport_host: "",
+    ws_max_early_data: 0,
+    ws_early_data_header_name: "",
   })
 
   // Load from initialConfig
@@ -75,6 +82,13 @@ export function TrojanForm({
       fallback_server_port: initialConfig.fallback?.server_port || 0,
       multiplex_enabled: initialConfig.multiplex?.enabled || false,
       multiplex_padding: initialConfig.multiplex?.padding || false,
+      multiplex_brutal: initialConfig.multiplex?.brutal?.enabled || false,
+      multiplex_brutal_up: initialConfig.multiplex?.brutal?.up_mbps || 0,
+      multiplex_brutal_down: initialConfig.multiplex?.brutal?.down_mbps || 0,
+      tls_alpn: (initialConfig.tls?.alpn || []).join(", "),
+      transport_host: Array.isArray(initialConfig.transport?.host) ? initialConfig.transport.host.join(", ") : initialConfig.transport?.host || "",
+      ws_max_early_data: initialConfig.transport?.max_early_data || 0,
+      ws_early_data_header_name: initialConfig.transport?.early_data_header_name || "",
     })
     isInitializedRef.current = true
   }, [initialConfig])
@@ -98,6 +112,8 @@ export function TrojanForm({
       users: trojanUsersBuilt,
     }
 
+    const alpnArr = trojanConfig.tls_alpn ? trojanConfig.tls_alpn.split(",").map(s => s.trim()).filter(Boolean) : []
+
     if (trojanConfig.tls_enabled) {
       if (trojanConfig.tls_mode === "acme" && trojanConfig.tls_acme_domain) {
         previewConfig.tls = {
@@ -117,6 +133,9 @@ export function TrojanForm({
       if (trojanConfig.tls_server_name) {
         previewConfig.tls.server_name = trojanConfig.tls_server_name
       }
+      if (alpnArr.length > 0) {
+        previewConfig.tls.alpn = alpnArr
+      }
     }
 
     if (trojanConfig.transport_type && trojanConfig.transport_type !== "tcp") {
@@ -133,6 +152,20 @@ export function TrojanForm({
       ) {
         previewConfig.transport.path = trojanConfig.transport_path
       }
+      if (trojanConfig.transport_type === "http" && trojanConfig.transport_host) {
+        previewConfig.transport.host = trojanConfig.transport_host.split(",").map((s: string) => s.trim()).filter(Boolean)
+      }
+      if (trojanConfig.transport_type === "httpupgrade" && trojanConfig.transport_host) {
+        previewConfig.transport.host = trojanConfig.transport_host
+      }
+      if (trojanConfig.transport_type === "ws") {
+        if (trojanConfig.ws_max_early_data > 0) {
+          previewConfig.transport.max_early_data = trojanConfig.ws_max_early_data
+        }
+        if (trojanConfig.ws_early_data_header_name) {
+          previewConfig.transport.early_data_header_name = trojanConfig.ws_early_data_header_name
+        }
+      }
     }
 
     if (trojanConfig.fallback_server && trojanConfig.fallback_server_port > 0) {
@@ -143,7 +176,14 @@ export function TrojanForm({
     }
 
     if (trojanConfig.multiplex_enabled) {
-      previewConfig.multiplex = { enabled: true, padding: trojanConfig.multiplex_padding }
+      previewConfig.multiplex = { enabled: true, padding: trojanConfig.multiplex_padding } as any
+      if (trojanConfig.multiplex_brutal) {
+        previewConfig.multiplex.brutal = {
+          enabled: true,
+          up_mbps: trojanConfig.multiplex_brutal_up,
+          down_mbps: trojanConfig.multiplex_brutal_down,
+        }
+      }
     }
 
     clearEndpoints()
@@ -383,6 +423,15 @@ export function TrojanForm({
                 </div>
               </>
             )}
+            <div className="space-y-2">
+              <Label>{t("alpnProtocol")}</Label>
+              <Input
+                value={trojanConfig.tls_alpn}
+                onChange={(e) => setTrojanConfig({ ...trojanConfig, tls_alpn: e.target.value })}
+                placeholder="h2, http/1.1"
+              />
+              <p className="text-xs text-muted-foreground">{t("alpnHint")}</p>
+            </div>
           </div>
         )}
       </div>
@@ -420,6 +469,37 @@ export function TrojanForm({
                   onChange={(e) => setTrojanConfig({ ...trojanConfig, transport_path: e.target.value })}
                   placeholder="/ws-path"
                 />
+              </div>
+            )}
+            {(trojanConfig.transport_type === "http" || trojanConfig.transport_type === "httpupgrade") && (
+              <div className="space-y-2">
+                <Label>{t("host")}</Label>
+                <Input
+                  value={trojanConfig.transport_host}
+                  onChange={(e) => setTrojanConfig({ ...trojanConfig, transport_host: e.target.value })}
+                  placeholder="example.com"
+                />
+              </div>
+            )}
+            {trojanConfig.transport_type === "ws" && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{t("maxEarlyData")}</Label>
+                  <Input
+                    type="number"
+                    value={trojanConfig.ws_max_early_data}
+                    onChange={(e) => setTrojanConfig({ ...trojanConfig, ws_max_early_data: parseInt(e.target.value) || 0 })}
+                    placeholder="2048"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("earlyDataHeader")}</Label>
+                  <Input
+                    value={trojanConfig.ws_early_data_header_name}
+                    onChange={(e) => setTrojanConfig({ ...trojanConfig, ws_early_data_header_name: e.target.value })}
+                    placeholder="Sec-WebSocket-Protocol"
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -462,15 +542,47 @@ export function TrojanForm({
           <Label htmlFor="trojan-multiplex">{t("multiplexEnabled")}</Label>
         </div>
         {trojanConfig.multiplex_enabled && (
-          <div className="flex items-center space-x-2 ml-6">
-            <input
-              type="checkbox"
-              id="trojan-multiplex-padding"
-              checked={trojanConfig.multiplex_padding}
-              onChange={(e) => setTrojanConfig({ ...trojanConfig, multiplex_padding: e.target.checked })}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            <Label htmlFor="trojan-multiplex-padding">{t("multiplexPadding")}</Label>
+          <div className="space-y-2 ml-6">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="trojan-multiplex-padding"
+                checked={trojanConfig.multiplex_padding}
+                onChange={(e) => setTrojanConfig({ ...trojanConfig, multiplex_padding: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="trojan-multiplex-padding">{t("multiplexPadding")}</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="trojan-multiplex-brutal"
+                checked={trojanConfig.multiplex_brutal}
+                onChange={(e) => setTrojanConfig({ ...trojanConfig, multiplex_brutal: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="trojan-multiplex-brutal">{t("enableBrutal")}</Label>
+            </div>
+            {trojanConfig.multiplex_brutal && (
+              <div className="grid grid-cols-2 gap-4 ml-6">
+                <div className="space-y-2">
+                  <Label>{t("upMbps")}</Label>
+                  <Input
+                    type="number"
+                    value={trojanConfig.multiplex_brutal_up}
+                    onChange={(e) => setTrojanConfig({ ...trojanConfig, multiplex_brutal_up: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("downMbps")}</Label>
+                  <Input
+                    type="number"
+                    value={trojanConfig.multiplex_brutal_down}
+                    onChange={(e) => setTrojanConfig({ ...trojanConfig, multiplex_brutal_down: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

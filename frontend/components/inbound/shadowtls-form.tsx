@@ -249,7 +249,7 @@ export function ShadowtlsForm({
               }
             >
               <Plus className="h-4 w-4 mr-1" />
-              添加
+              {tc("add")}
             </Button>
           </div>
 

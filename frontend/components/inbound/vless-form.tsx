@@ -49,6 +49,13 @@ export function VlessForm({
     transport_service_name: "",
     multiplex_enabled: false,
     multiplex_padding: false,
+    multiplex_brutal: false,
+    multiplex_brutal_up: 0,
+    multiplex_brutal_down: 0,
+    tls_alpn: "",
+    transport_host: "",
+    ws_max_early_data: 0,
+    ws_early_data_header_name: "",
   })
 
   const [tlsCheckState, setTlsCheckState] = useState<{
@@ -93,6 +100,13 @@ export function VlessForm({
       transport_service_name: initialConfig.transport?.service_name || "",
       multiplex_enabled: initialConfig.multiplex?.enabled || false,
       multiplex_padding: initialConfig.multiplex?.padding || false,
+      multiplex_brutal: initialConfig.multiplex?.brutal?.enabled || false,
+      multiplex_brutal_up: initialConfig.multiplex?.brutal?.up_mbps || 0,
+      multiplex_brutal_down: initialConfig.multiplex?.brutal?.down_mbps || 0,
+      tls_alpn: (initialConfig.tls?.alpn || []).join(", "),
+      transport_host: Array.isArray(initialConfig.transport?.host) ? initialConfig.transport.host.join(", ") : initialConfig.transport?.host || "",
+      ws_max_early_data: initialConfig.transport?.max_early_data || 0,
+      ws_early_data_header_name: initialConfig.transport?.early_data_header_name || "",
     })
 
     if (initialConfig.tls?.reality?.private_key) {
@@ -128,6 +142,8 @@ export function VlessForm({
       users: vlessUsers,
     }
 
+    const alpnArr = vlessConfig.tls_alpn ? vlessConfig.tls_alpn.split(",").map(s => s.trim()).filter(Boolean) : []
+
     if (vlessConfig.tls_enabled) {
       if (vlessConfig.tls_mode === "reality") {
         previewConfig.tls = {
@@ -162,6 +178,9 @@ export function VlessForm({
       if (vlessConfig.tls_server_name && vlessConfig.tls_mode !== "reality") {
         previewConfig.tls.server_name = vlessConfig.tls_server_name
       }
+      if (alpnArr.length > 0) {
+        previewConfig.tls.alpn = alpnArr
+      }
     }
 
     if (vlessConfig.transport_type && vlessConfig.transport_type !== "tcp") {
@@ -174,10 +193,31 @@ export function VlessForm({
       if (vlessConfig.transport_type === "grpc" && vlessConfig.transport_service_name) {
         previewConfig.transport.service_name = vlessConfig.transport_service_name
       }
+      if (vlessConfig.transport_type === "http" && vlessConfig.transport_host) {
+        previewConfig.transport.host = vlessConfig.transport_host.split(",").map((s: string) => s.trim()).filter(Boolean)
+      }
+      if (vlessConfig.transport_type === "httpupgrade" && vlessConfig.transport_host) {
+        previewConfig.transport.host = vlessConfig.transport_host
+      }
+      if (vlessConfig.transport_type === "ws") {
+        if (vlessConfig.ws_max_early_data > 0) {
+          previewConfig.transport.max_early_data = vlessConfig.ws_max_early_data
+        }
+        if (vlessConfig.ws_early_data_header_name) {
+          previewConfig.transport.early_data_header_name = vlessConfig.ws_early_data_header_name
+        }
+      }
     }
 
     if (vlessConfig.multiplex_enabled) {
-      previewConfig.multiplex = { enabled: true, padding: vlessConfig.multiplex_padding }
+      previewConfig.multiplex = { enabled: true, padding: vlessConfig.multiplex_padding } as any
+      if (vlessConfig.multiplex_brutal) {
+        previewConfig.multiplex.brutal = {
+          enabled: true,
+          up_mbps: vlessConfig.multiplex_brutal_up,
+          down_mbps: vlessConfig.multiplex_brutal_down,
+        }
+      }
     }
 
     clearEndpoints()
@@ -517,7 +557,7 @@ export function VlessForm({
                   />
                   <p className="text-xs text-muted-foreground">
                     {vlessConfig.reality_handshake_server
-                      ? `默认使用握手服务器: ${vlessConfig.reality_handshake_server}`
+                      ? `${t("realityHandshakeHint")}: ${vlessConfig.reality_handshake_server}`
                       : ""}
                   </p>
                 </div>
@@ -638,6 +678,15 @@ export function VlessForm({
                 </div>
               </>
             )}
+            <div className="space-y-2">
+              <Label>{t("alpnProtocol")}</Label>
+              <Input
+                value={vlessConfig.tls_alpn}
+                onChange={(e) => setVlessConfig({ ...vlessConfig, tls_alpn: e.target.value })}
+                placeholder="h2, http/1.1"
+              />
+              <p className="text-xs text-muted-foreground">{t("alpnHint")}</p>
+            </div>
           </div>
         )}
       </div>
@@ -684,6 +733,37 @@ export function VlessForm({
                 />
               </div>
             )}
+            {(vlessConfig.transport_type === "http" || vlessConfig.transport_type === "httpupgrade") && (
+              <div className="space-y-2">
+                <Label>{t("host")}</Label>
+                <Input
+                  value={vlessConfig.transport_host}
+                  onChange={(e) => setVlessConfig({ ...vlessConfig, transport_host: e.target.value })}
+                  placeholder="example.com"
+                />
+              </div>
+            )}
+            {vlessConfig.transport_type === "ws" && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{t("maxEarlyData")}</Label>
+                  <Input
+                    type="number"
+                    value={vlessConfig.ws_max_early_data}
+                    onChange={(e) => setVlessConfig({ ...vlessConfig, ws_max_early_data: parseInt(e.target.value) || 0 })}
+                    placeholder="2048"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("earlyDataHeader")}</Label>
+                  <Input
+                    value={vlessConfig.ws_early_data_header_name}
+                    onChange={(e) => setVlessConfig({ ...vlessConfig, ws_early_data_header_name: e.target.value })}
+                    placeholder="Sec-WebSocket-Protocol"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -701,15 +781,47 @@ export function VlessForm({
           <Label htmlFor="vless-multiplex">{t("multiplexEnabled")}</Label>
         </div>
         {vlessConfig.multiplex_enabled && (
-          <div className="flex items-center space-x-2 ml-6">
-            <input
-              type="checkbox"
-              id="vless-multiplex-padding"
-              checked={vlessConfig.multiplex_padding}
-              onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_padding: e.target.checked })}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            <Label htmlFor="vless-multiplex-padding">{t("multiplexPadding")}</Label>
+          <div className="space-y-2 ml-6">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="vless-multiplex-padding"
+                checked={vlessConfig.multiplex_padding}
+                onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_padding: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="vless-multiplex-padding">{t("multiplexPadding")}</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="vless-multiplex-brutal"
+                checked={vlessConfig.multiplex_brutal}
+                onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_brutal: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="vless-multiplex-brutal">{t("enableBrutal")}</Label>
+            </div>
+            {vlessConfig.multiplex_brutal && (
+              <div className="grid grid-cols-2 gap-4 ml-6">
+                <div className="space-y-2">
+                  <Label>{t("upMbps")}</Label>
+                  <Input
+                    type="number"
+                    value={vlessConfig.multiplex_brutal_up}
+                    onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_brutal_up: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("downMbps")}</Label>
+                  <Input
+                    type="number"
+                    value={vlessConfig.multiplex_brutal_down}
+                    onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_brutal_down: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

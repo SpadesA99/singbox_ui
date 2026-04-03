@@ -23,6 +23,8 @@ export function Hysteria2Form({ initialConfig, setOutbound }: OutboundFormProps)
     tls_insecure: false,
     tls_alpn: "",
     network: "",
+    hop_interval: "",
+    server_ports: "",
   })
 
   useEffect(() => {
@@ -40,6 +42,8 @@ export function Hysteria2Form({ initialConfig, setOutbound }: OutboundFormProps)
         tls_insecure: initialConfig.tls?.insecure || false,
         tls_alpn: Array.isArray(initialConfig.tls?.alpn) ? initialConfig.tls.alpn.join(",") : "",
         network: Array.isArray(initialConfig.network) ? initialConfig.network[0] : (initialConfig.network || ""),
+        hop_interval: initialConfig.hop_interval || "",
+        server_ports: Array.isArray(initialConfig.server_ports) ? initialConfig.server_ports.join(", ") : "",
       })
     }
     isInitializedRef.current = true
@@ -83,6 +87,12 @@ export function Hysteria2Form({ initialConfig, setOutbound }: OutboundFormProps)
       tlsConfig.alpn = hy2Config.tls_alpn.split(",").map((s: string) => s.trim()).filter(Boolean)
     }
     previewConfig.tls = tlsConfig
+    if (hy2Config.server_ports) {
+      previewConfig.server_ports = hy2Config.server_ports.split(",").map((s: string) => s.trim()).filter(Boolean)
+    }
+    if (hy2Config.hop_interval) {
+      previewConfig.hop_interval = hy2Config.hop_interval
+    }
 
     setOutbound(0, previewConfig)
   }, [hy2Config, setOutbound])
@@ -144,6 +154,22 @@ export function Hysteria2Form({ initialConfig, setOutbound }: OutboundFormProps)
             <option value="udp">{t("udpOnly")}</option>
           </select>
         </div>
+      </div>
+      <div className="space-y-2">
+        <Label>{t("serverPorts")}</Label>
+        <Input
+          value={hy2Config.server_ports}
+          onChange={(e) => setHy2Config({ ...hy2Config, server_ports: e.target.value })}
+          placeholder={t("serverPortsHint")}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>{t("hopInterval")}</Label>
+        <Input
+          value={hy2Config.hop_interval}
+          onChange={(e) => setHy2Config({ ...hy2Config, hop_interval: e.target.value })}
+          placeholder={t("hopIntervalHint")}
+        />
       </div>
 
       {/* Obfuscation */}

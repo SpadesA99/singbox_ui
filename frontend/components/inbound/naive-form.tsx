@@ -31,6 +31,7 @@ export function NaiveForm({
     tls_certificate_path: "/etc/sing-box/cert.pem",
     tls_key_path: "/etc/sing-box/key.pem",
     network: "" as "" | "tcp" | "udp",
+    quic_congestion_control: "",
   })
 
   const [initialized, setInitialized] = useState(false)
@@ -55,6 +56,7 @@ export function NaiveForm({
       tls_certificate_path: initialConfig.tls?.certificate_path || "/etc/sing-box/cert.pem",
       tls_key_path: initialConfig.tls?.key_path || "/etc/sing-box/key.pem",
       network: (typeof initialConfig.network === "string" ? initialConfig.network : "") as "" | "tcp" | "udp",
+      quic_congestion_control: initialConfig.quic_congestion_control || "",
     })
     setInitialized(true)
   }, [initialConfig, initialized])
@@ -90,6 +92,9 @@ export function NaiveForm({
     }
     if (naiveConfig.network) {
       previewConfig.network = naiveConfig.network
+    }
+    if (naiveConfig.quic_congestion_control) {
+      previewConfig.quic_congestion_control = naiveConfig.quic_congestion_control
     }
 
     clearEndpoints()
@@ -209,6 +214,20 @@ export function NaiveForm({
           <option value="">{t("networkBoth")}</option>
           <option value="tcp">TCP</option>
           <option value="udp">UDP</option>
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>{t("quicCongestionControl")}</Label>
+        <select
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          value={naiveConfig.quic_congestion_control}
+          onChange={(e) => setNaiveConfig({ ...naiveConfig, quic_congestion_control: e.target.value })}
+        >
+          <option value="">{t("defaultAuto")}</option>
+          <option value="cubic">Cubic</option>
+          <option value="new_reno">New Reno</option>
+          <option value="bbr">BBR</option>
         </select>
       </div>
 

@@ -36,6 +36,7 @@ export function WireguardForm({
     const loadedPeers = ((wgEndpoint?.peers || initialConfig?.peers) || []).map((peer: any) => ({
       publicKey: peer.public_key || "",
       privateKey: peer.private_key,
+      presharedKey: peer.pre_shared_key || "",
       allowedIPs: peer.allowed_ips || [],
     }))
     setWgConfig({
@@ -53,10 +54,14 @@ export function WireguardForm({
     if (!isInitializedRef.current) return
     const wgPeers = wgConfig.peers
       .filter((p) => p.publicKey)
-      .map((p) => ({
-        public_key: p.publicKey,
-        allowed_ips: p.allowedIPs,
-      }))
+      .map((p) => {
+        const peer: any = {
+          public_key: p.publicKey,
+          allowed_ips: p.allowedIPs,
+        }
+        if (p.presharedKey) peer.pre_shared_key = p.presharedKey
+        return peer
+      })
 
     setEndpoint(0, {
       type: "wireguard",
@@ -393,6 +398,19 @@ PersistentKeepalive = 25`
                     newPeers[index].allowedIPs = e.target.value.split(",").map((s) => s.trim())
                     setWgConfig({ ...wgConfig, peers: newPeers })
                   }}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">{t("presharedKeyLabel")}</Label>
+                <Input
+                  placeholder={t("presharedKeyOptional")}
+                  value={peer.presharedKey || ""}
+                  onChange={(e) => {
+                    const newPeers = [...wgConfig.peers]
+                    newPeers[index].presharedKey = e.target.value
+                    setWgConfig({ ...wgConfig, peers: newPeers })
+                  }}
+                  className="font-mono text-xs"
                 />
               </div>
             </div>

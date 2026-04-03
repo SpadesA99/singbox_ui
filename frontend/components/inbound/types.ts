@@ -43,6 +43,7 @@ export interface AnyTLSUser {
 export interface LocalPeer {
   publicKey: string
   privateKey?: string
+  presharedKey?: string
   allowedIPs: string[]
 }
 

@@ -20,6 +20,9 @@ export function AnytlsForm({ initialConfig, setOutbound }: OutboundFormProps) {
     idle_session_check_interval: "",
     idle_session_timeout: "",
     min_idle_session: 0,
+    tls_alpn: "",
+    utls_enabled: false,
+    utls_fingerprint: "chrome",
   })
 
   useEffect(() => {
@@ -34,6 +37,9 @@ export function AnytlsForm({ initialConfig, setOutbound }: OutboundFormProps) {
         idle_session_check_interval: String(initialConfig.idle_session_check_interval || ""),
         idle_session_timeout: String(initialConfig.idle_session_timeout || ""),
         min_idle_session: Number(initialConfig.min_idle_session) || 0,
+        tls_alpn: Array.isArray(initialConfig.tls?.alpn) ? initialConfig.tls.alpn.join(",") : "",
+        utls_enabled: initialConfig.tls?.utls?.enabled || false,
+        utls_fingerprint: initialConfig.tls?.utls?.fingerprint || "chrome",
       })
     }
     isInitializedRef.current = true
@@ -57,6 +63,12 @@ export function AnytlsForm({ initialConfig, setOutbound }: OutboundFormProps) {
     }
     if (anytlsConfig.tls_insecure) {
       anytlsTlsConfig.insecure = true
+    }
+    if (anytlsConfig.tls_alpn) {
+      anytlsTlsConfig.alpn = anytlsConfig.tls_alpn.split(",").map((s: string) => s.trim()).filter(Boolean)
+    }
+    if (anytlsConfig.utls_enabled) {
+      anytlsTlsConfig.utls = { enabled: true, fingerprint: anytlsConfig.utls_fingerprint }
     }
     previewConfig.tls = anytlsTlsConfig
     // Session management
@@ -126,6 +138,44 @@ export function AnytlsForm({ initialConfig, setOutbound }: OutboundFormProps) {
             </label>
           </div>
         </div>
+        <div className="space-y-2">
+          <Label>ALPN</Label>
+          <Input
+            placeholder="h2,http/1.1"
+            value={anytlsConfig.tls_alpn}
+            onChange={(e) => setAnytlsConfig({ ...anytlsConfig, tls_alpn: e.target.value })}
+          />
+        </div>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={anytlsConfig.utls_enabled}
+              onChange={(e) => setAnytlsConfig({ ...anytlsConfig, utls_enabled: e.target.checked })}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            {t("enableUtls")}
+          </label>
+        </div>
+        {anytlsConfig.utls_enabled && (
+          <div className="space-y-2">
+            <Label>{t("browserFingerprint")}</Label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={anytlsConfig.utls_fingerprint}
+              onChange={(e) => setAnytlsConfig({ ...anytlsConfig, utls_fingerprint: e.target.value })}
+            >
+              <option value="chrome">Chrome</option>
+              <option value="firefox">Firefox</option>
+              <option value="safari">Safari</option>
+              <option value="edge">Edge</option>
+              <option value="ios">iOS</option>
+              <option value="android">Android</option>
+              <option value="random">{t("random")}</option>
+              <option value="randomized">{t("randomized")}</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Session management */}

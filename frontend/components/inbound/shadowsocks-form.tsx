@@ -17,6 +17,10 @@ interface ShadowsocksConfig {
   users: { name: string; password: string }[]
   multiplex_enabled: boolean
   multiplex_padding: boolean
+  multiplex_brutal: boolean
+  multiplex_brutal_up: number
+  multiplex_brutal_down: number
+  network: "" | "tcp" | "udp"
 }
 
 export function ShadowsocksForm({
@@ -40,6 +44,10 @@ export function ShadowsocksForm({
     users: [],
     multiplex_enabled: false,
     multiplex_padding: false,
+    multiplex_brutal: false,
+    multiplex_brutal_up: 0,
+    multiplex_brutal_down: 0,
+    network: "",
   })
 
   // Load from initialConfig
@@ -57,6 +65,10 @@ export function ShadowsocksForm({
       users: (initialConfig.users || []).map((u: any) => ({ name: u.name || "", password: u.password || "" })),
       multiplex_enabled: initialConfig.multiplex?.enabled || false,
       multiplex_padding: initialConfig.multiplex?.padding || false,
+      multiplex_brutal: initialConfig.multiplex?.brutal?.enabled || false,
+      multiplex_brutal_up: initialConfig.multiplex?.brutal?.up_mbps || 0,
+      multiplex_brutal_down: initialConfig.multiplex?.brutal?.down_mbps || 0,
+      network: (typeof initialConfig.network === "string" ? initialConfig.network : "") as "" | "tcp" | "udp",
     })
     isInitializedRef.current = true
   }, [initialConfig])
@@ -82,7 +94,17 @@ export function ShadowsocksForm({
         })
     }
     if (ssConfig.multiplex_enabled) {
-      previewConfig.multiplex = { enabled: true, padding: ssConfig.multiplex_padding }
+      previewConfig.multiplex = { enabled: true, padding: ssConfig.multiplex_padding } as any
+      if (ssConfig.multiplex_brutal) {
+        previewConfig.multiplex.brutal = {
+          enabled: true,
+          up_mbps: ssConfig.multiplex_brutal_up,
+          down_mbps: ssConfig.multiplex_brutal_down,
+        }
+      }
+    }
+    if (ssConfig.network) {
+      previewConfig.network = ssConfig.network
     }
     clearEndpoints()
     setInbound(0, previewConfig)
@@ -238,6 +260,19 @@ export function ShadowsocksForm({
         ))}
         <p className="text-xs text-muted-foreground">{t("ssMultiUserHint")}</p>
       </div>
+      {/* Network */}
+      <div className="space-y-2">
+        <Label>{t("naiveNetwork")}</Label>
+        <select
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          value={ssConfig.network}
+          onChange={(e) => setSsConfig({ ...ssConfig, network: e.target.value as "" | "tcp" | "udp" })}
+        >
+          <option value="">{t("networkBoth")}</option>
+          <option value="tcp">TCP</option>
+          <option value="udp">UDP</option>
+        </select>
+      </div>
       {/* Multiplex */}
       <div className="space-y-2">
         <div className="flex items-center space-x-2">
@@ -251,15 +286,47 @@ export function ShadowsocksForm({
           <Label htmlFor="ss-multiplex">{t("multiplexEnabled")}</Label>
         </div>
         {ssConfig.multiplex_enabled && (
-          <div className="flex items-center space-x-2 ml-6">
-            <input
-              type="checkbox"
-              id="ss-multiplex-padding"
-              checked={ssConfig.multiplex_padding}
-              onChange={(e) => setSsConfig({ ...ssConfig, multiplex_padding: e.target.checked })}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            <Label htmlFor="ss-multiplex-padding">{t("multiplexPadding")}</Label>
+          <div className="space-y-2 ml-6">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="ss-multiplex-padding"
+                checked={ssConfig.multiplex_padding}
+                onChange={(e) => setSsConfig({ ...ssConfig, multiplex_padding: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="ss-multiplex-padding">{t("multiplexPadding")}</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="ss-multiplex-brutal"
+                checked={ssConfig.multiplex_brutal}
+                onChange={(e) => setSsConfig({ ...ssConfig, multiplex_brutal: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="ss-multiplex-brutal">{t("enableBrutal")}</Label>
+            </div>
+            {ssConfig.multiplex_brutal && (
+              <div className="grid grid-cols-2 gap-4 ml-6">
+                <div className="space-y-2">
+                  <Label>{t("upMbps")}</Label>
+                  <Input
+                    type="number"
+                    value={ssConfig.multiplex_brutal_up}
+                    onChange={(e) => setSsConfig({ ...ssConfig, multiplex_brutal_up: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("downMbps")}</Label>
+                  <Input
+                    type="number"
+                    value={ssConfig.multiplex_brutal_down}
+                    onChange={(e) => setSsConfig({ ...ssConfig, multiplex_brutal_down: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

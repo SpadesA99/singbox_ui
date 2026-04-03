@@ -21,6 +21,7 @@ interface Hysteria2Config {
   tls_acme_domain: string
   tls_certificate_path: string
   tls_key_path: string
+  tls_server_name: string
   obfs_type: string
   obfs_password: string
   masquerade: string
@@ -56,6 +57,7 @@ export function Hysteria2Form({
     tls_acme_domain: "",
     tls_certificate_path: "/etc/sing-box/cert.pem",
     tls_key_path: "/etc/sing-box/key.pem",
+    tls_server_name: "",
     obfs_type: "",
     obfs_password: "",
     masquerade: "",
@@ -81,6 +83,7 @@ export function Hysteria2Form({
       tls_acme_domain: initialConfig.tls?.acme?.domain?.[0] || "",
       tls_certificate_path: initialConfig.tls?.certificate_path || "/etc/sing-box/cert.pem",
       tls_key_path: initialConfig.tls?.key_path || "/etc/sing-box/key.pem",
+      tls_server_name: initialConfig.tls?.server_name || "",
       obfs_type: initialConfig.obfs?.type || "",
       obfs_password: initialConfig.obfs?.password || "",
       masquerade: typeof initialConfig.masquerade === "string" ? initialConfig.masquerade : "",
@@ -107,6 +110,7 @@ export function Hysteria2Form({
       tls: hy2Config.tls_mode === "acme" && hy2Config.tls_acme_domain ? {
         enabled: true,
         alpn: hy2Config.tls_alpn,
+        ...(hy2Config.tls_server_name ? { server_name: hy2Config.tls_server_name } : {}),
         acme: {
           domain: [hy2Config.tls_acme_domain],
           data_directory: "/var/lib/sing-box/acme",
@@ -114,6 +118,7 @@ export function Hysteria2Form({
       } : {
         enabled: true,
         alpn: hy2Config.tls_alpn,
+        ...(hy2Config.tls_server_name ? { server_name: hy2Config.tls_server_name } : {}),
         certificate_path: hy2Config.tls_certificate_path,
         key_path: hy2Config.tls_key_path,
       },
@@ -232,7 +237,7 @@ export function Hysteria2Form({
             onClick={() => setHy2Config({ ...hy2Config, password: generateSecureRandomString(16) })}
           >
             <Key className="h-4 w-4 mr-1" />
-            生成
+            {tc("generate")}
           </Button>
         </div>
       </div>
@@ -280,6 +285,14 @@ export function Hysteria2Form({
           </div>
         </div>
       </div>
+      <div className="space-y-2">
+          <Label>{t("serverNameOptional")}</Label>
+          <Input
+            value={hy2Config.tls_server_name}
+            onChange={(e) => setHy2Config({ ...hy2Config, tls_server_name: e.target.value })}
+            placeholder="example.com"
+          />
+        </div>
       {hy2Config.tls_mode === "acme" ? (
         <div className="space-y-2">
           <Label>{t("acmeDomain")}</Label>

@@ -21,6 +21,8 @@ export function HttpForm({ initialConfig, setInbound, clearEndpoints, onError, c
     username: "",
     password: "",
     tls_enabled: false,
+    tls_mode: "manual" as "manual" | "acme",
+    tls_acme_domain: "",
     tls_certificate_path: "/etc/sing-box/cert.pem",
     tls_key_path: "/etc/sing-box/key.pem",
   })
@@ -39,6 +41,8 @@ export function HttpForm({ initialConfig, setInbound, clearEndpoints, onError, c
       username: (initialConfig.users?.[0] as any)?.username || "",
       password: (initialConfig.users?.[0] as any)?.password || "",
       tls_enabled: initialConfig.tls?.enabled || false,
+      tls_mode: (initialConfig.tls?.acme?.domain?.length ?? 0) > 0 ? "acme" : "manual",
+      tls_acme_domain: initialConfig.tls?.acme?.domain?.[0] || "",
       tls_certificate_path: initialConfig.tls?.certificate_path || "/etc/sing-box/cert.pem",
       tls_key_path: initialConfig.tls?.key_path || "/etc/sing-box/key.pem",
     })
@@ -64,10 +68,20 @@ export function HttpForm({ initialConfig, setInbound, clearEndpoints, onError, c
       ]
     }
     if (config.tls_enabled) {
-      previewConfig.tls = {
-        enabled: true,
-        certificate_path: config.tls_certificate_path,
-        key_path: config.tls_key_path,
+      if (config.tls_mode === "acme" && config.tls_acme_domain) {
+        previewConfig.tls = {
+          enabled: true,
+          acme: {
+            domain: [config.tls_acme_domain],
+            data_directory: "/var/lib/sing-box/acme",
+          },
+        }
+      } else {
+        previewConfig.tls = {
+          enabled: true,
+          certificate_path: config.tls_certificate_path,
+          key_path: config.tls_key_path,
+        }
       }
     }
 
@@ -172,39 +186,63 @@ export function HttpForm({ initialConfig, setInbound, clearEndpoints, onError, c
         </div>
         {config.tls_enabled && (
           <div className="space-y-2 pl-6">
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => onGenerateCert()}
-                disabled={certLoading}
+            <div className="flex gap-2 items-center">
+              <select
+                value={config.tls_mode}
+                onChange={(e) => setConfig({ ...config, tls_mode: e.target.value as "manual" | "acme" })}
+                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
               >
-                <Shield className="h-4 w-4 mr-1" />
-                {certLoading ? t("generating") : t("generateSelfSignedCert")}
-              </Button>
-              {certInfo && (
+                <option value="manual">{t("manualConfig")}</option>
+                <option value="acme">{t("acmeAuto")}</option>
+              </select>
+              {config.tls_mode === "manual" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onGenerateCert()}
+                  disabled={certLoading}
+                >
+                  <Shield className="h-4 w-4 mr-1" />
+                  {certLoading ? t("generating") : t("generateSelfSignedCert")}
+                </Button>
+              )}
+              {certInfo && config.tls_mode === "manual" && (
                 <span className="text-xs text-muted-foreground self-center">
                   {t("certGenerated", { name: certInfo.common_name ?? "", validTo: certInfo.valid_to ?? "" })}
                 </span>
               )}
             </div>
-            <div className="space-y-2">
-              <Label>{t("certPath")}</Label>
-              <Input
-                value={config.tls_certificate_path}
-                onChange={(e) => setConfig({ ...config, tls_certificate_path: e.target.value })}
-                placeholder="/etc/sing-box/cert.pem"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{t("keyPath")}</Label>
-              <Input
-                value={config.tls_key_path}
-                onChange={(e) => setConfig({ ...config, tls_key_path: e.target.value })}
-                placeholder="/etc/sing-box/key.pem"
-              />
-            </div>
+            {config.tls_mode === "acme" ? (
+              <div className="space-y-2">
+                <Label>{t("acmeDomain")}</Label>
+                <Input
+                  value={config.tls_acme_domain}
+                  onChange={(e) => setConfig({ ...config, tls_acme_domain: e.target.value })}
+                  placeholder="example.com"
+                />
+                <p className="text-xs text-muted-foreground">{t("acmeHint")}</p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label>{t("certPath")}</Label>
+                  <Input
+                    value={config.tls_certificate_path}
+                    onChange={(e) => setConfig({ ...config, tls_certificate_path: e.target.value })}
+                    placeholder="/etc/sing-box/cert.pem"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("keyPath")}</Label>
+                  <Input
+                    value={config.tls_key_path}
+                    onChange={(e) => setConfig({ ...config, tls_key_path: e.target.value })}
+                    placeholder="/etc/sing-box/key.pem"
+                  />
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
