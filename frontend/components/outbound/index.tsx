@@ -104,7 +104,7 @@ export function OutboundConfig({ showCard = true }: OutboundConfigProps) {
     }
   }, [enableBalancer, selectedNodeTags, balancerStrategy, subscriptions, setBalancerState])
 
-  // Handle direct/block/subscription type changes only — protocol tabs manage their own store writes
+  // Handle outbound type changes — write store immediately so JSON stays in sync
   useEffect(() => {
     if (!isInitializedRef.current) return
     if (outboundType === "direct") {
@@ -117,9 +117,13 @@ export function OutboundConfig({ showCard = true }: OutboundConfigProps) {
         setOutbound(0, outboundWithProxyTag)
         prevSelectedNodeRef.current = selectedNode
       } else if (!selectedNode) {
-        // Clear stale protocol config when switching to subscription with no node selected
         setOutbound(0, { type: "direct", tag: "proxy_out" })
       }
+    } else {
+      // Protocol tab: write a minimal placeholder immediately so JSON reflects the
+      // correct type even before the form fills in server/credentials.
+      // The mounted protocol form will overwrite this once its fields are populated.
+      setOutbound(0, { type: outboundType as any, tag: "proxy_out" })
     }
   }, [outboundType, selectedNode, setOutbound])
 

@@ -349,22 +349,10 @@ export default function Home() {
             </Select>
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t border-border/50">
-            <LanguageSwitcher />
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-white dark:bg-zinc-800 px-2 py-1 rounded-md border shadow-sm">
-                <Server className="h-3 w-3" />
-                <span>{singboxVersion || tc("checking")}</span>
-              </div>
-              <a
-                href="https://github.com/SpadesA99/singbox_ui"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                title="GitHub Repository"
-              >
-                <Github className="h-4 w-4" />
-              </a>
+          <div className="flex items-center pt-2 border-t border-border/50">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-white dark:bg-zinc-800 px-2 py-1 rounded-md border shadow-sm">
+              <Server className="h-3 w-3" />
+              <span>{singboxVersion || tc("checking")}</span>
             </div>
           </div>
         </div>
@@ -457,6 +445,20 @@ export default function Home() {
               <Code className="h-4 w-4 mr-2" />
               JSON
             </Button>
+
+            <div className="h-5 w-px bg-border mx-1"></div>
+
+            <a
+              href="https://github.com/SpadesA99/singbox_ui"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center h-9 w-9 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-accent"
+              title="GitHub Repository"
+            >
+              <Github className="h-4 w-4" />
+            </a>
+
+            <LanguageSwitcher />
           </div>
         </header>
 
@@ -553,7 +555,7 @@ export default function Home() {
             {/* Editor Body */}
             <div className="flex-1 overflow-hidden p-6 bg-zinc-50 dark:bg-zinc-950">
               {hasConfig ? (
-                <div className="h-full rounded-lg border overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
+                <div className="h-full rounded-lg overflow-hidden">
                   <JsonEditor 
                     value={jsonEditMode ? editedJson : JSON.stringify(fullConfig, null, 2)} 
                     onChange={jsonEditMode ? setEditedJson : undefined} 
