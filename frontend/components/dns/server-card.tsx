@@ -73,7 +73,7 @@ export function ServerCard({ server, index, expanded, onToggleExpand, onUpdate, 
 
         {expanded && (
           <div className="grid grid-cols-2 gap-2 mt-2">
-            {(server.type === "udp" || server.type === "tcp" || server.type === "tls" || server.type === "quic" || server.type === "https" || server.type === "http3") && (
+            {(server.type === "udp" || server.type === "tcp" || server.type === "tls" || server.type === "quic" || server.type === "https" || server.type === "h3") && (
               <div className="space-y-1">
                 <Label className="text-xs">{tc("port")}</Label>
                 <Input
@@ -92,7 +92,7 @@ export function ServerCard({ server, index, expanded, onToggleExpand, onUpdate, 
               </div>
             )}
 
-            {(server.type === "https" || server.type === "http3") && (
+            {(server.type === "https" || server.type === "h3") && (
               <div className="space-y-1">
                 <Label className="text-xs">{t("path")}</Label>
                 <Input

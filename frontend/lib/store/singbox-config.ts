@@ -661,7 +661,7 @@ export interface Outbound {
 
 export interface DNSServerOptions {
   tag: string
-  type?: string // "udp" | "tcp" | "tls" | "https" | "quic" | "http3" | "dhcp" | "fakeip" | "local" | "hosts"
+  type?: string // "udp" | "tcp" | "tls" | "https" | "quic" | "h3" | "dhcp" | "fakeip" | "local" | "hosts"
   // Common options
   server?: string
   server_port?: number

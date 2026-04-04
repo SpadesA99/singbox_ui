@@ -13,7 +13,7 @@ export function extractTransportHost(transport: any): string {
     ? transport.headers.Host[0]
     : transport.headers?.Host
   const directHost = Array.isArray(transport.host)
-    ? transport.host[0]
+    ? transport.host.join(", ")
     : transport.host
   return headerHost || directHost || ""
 }
