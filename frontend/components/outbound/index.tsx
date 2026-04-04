@@ -120,10 +120,11 @@ export function OutboundConfig({ showCard = true }: OutboundConfigProps) {
         setOutbound(0, { type: "direct", tag: "proxy_out" })
       }
     } else {
-      // Protocol tab: write a minimal placeholder immediately so JSON reflects the
-      // correct type even before the form fills in server/credentials.
-      // The mounted protocol form will overwrite this once its fields are populated.
-      setOutbound(0, { type: outboundType as any, tag: "proxy_out" })
+      // Only write placeholder if the stored outbound doesn't already have this type
+      const currentType = useSingboxConfigStore.getState().config.outbounds?.[0]?.type
+      if (currentType !== outboundType) {
+        setOutbound(0, { type: outboundType as any, tag: "proxy_out" })
+      }
     }
   }, [outboundType, selectedNode, setOutbound])
 

@@ -1,97 +1,86 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useTranslation } from "@/lib/i18n"
 import { OutboundFormProps } from "./types"
-import { Shield, Zap, Globe, Server, Settings, ShieldCheck, Cpu, Network, Key } from "lucide-react"
+import { Server, Settings } from "lucide-react"
+
+interface WgFlat {
+  private_key: string
+  local_address: string
+  mtu: number
+  peer_address: string
+  peer_port: number
+  peer_public_key: string
+  pre_shared_key: string
+  allowed_ips: string
+  keepalive_interval: number
+  reserved: string
+}
+
+function deriveFlat(initialConfig: any): WgFlat {
+  const c = initialConfig?.type === "wireguard" ? initialConfig : null
+  const peer = c?.peers?.[0]
+  const peerAddress = peer?.address || c?.server || ""
+  const peerPort = peer?.port || c?.server_port || 51820
+  const peerPublicKey = peer?.public_key || c?.peer_public_key || ""
+  const peerPreSharedKey = peer?.pre_shared_key || c?.pre_shared_key || ""
+  const peerReserved = peer?.reserved || c?.reserved
+  const peerAllowedIPs = peer?.allowed_ips
+  const peerKeepalive = peer?.persistent_keepalive_interval || 0
+  const localAddr = c?.address?.[0] || c?.local_address?.[0] || "10.10.0.2/32"
+
+  return {
+    private_key: c?.private_key || "",
+    local_address: typeof localAddr === "string" ? localAddr : "10.10.0.2/32",
+    mtu: c?.mtu || 1420,
+    peer_address: peerAddress,
+    peer_port: peerPort,
+    peer_public_key: peerPublicKey,
+    pre_shared_key: peerPreSharedKey,
+    allowed_ips: Array.isArray(peerAllowedIPs) ? peerAllowedIPs.join(", ") : "0.0.0.0/0, ::/0",
+    keepalive_interval: peerKeepalive,
+    reserved: Array.isArray(peerReserved) ? peerReserved.join(",") : "",
+  }
+}
+
+function buildWgOutbound(s: WgFlat): any {
+  const peer: any = {
+    address: s.peer_address,
+    port: s.peer_port,
+    public_key: s.peer_public_key,
+  }
+  if (s.pre_shared_key) peer.pre_shared_key = s.pre_shared_key
+  if (s.allowed_ips) {
+    peer.allowed_ips = s.allowed_ips.split(",").map((x: string) => x.trim()).filter(Boolean)
+  }
+  if (s.keepalive_interval) peer.persistent_keepalive_interval = s.keepalive_interval
+  if (s.reserved) {
+    const reservedArr = s.reserved.split(",").map((x: string) => parseInt(x.trim())).filter((n: number) => !isNaN(n))
+    if (reservedArr.length === 3) peer.reserved = reservedArr
+  }
+  return {
+    type: "wireguard",
+    tag: "proxy_out",
+    address: [s.local_address],
+    private_key: s.private_key,
+    mtu: s.mtu,
+    peers: [peer],
+  }
+}
 
 export function WireguardForm({ initialConfig, setOutbound }: OutboundFormProps) {
   const { t } = useTranslation("outbound")
   const { t: tc } = useTranslation("common")
-  const isInitializedRef = useRef(false)
 
-  const [wgConfig, setWgConfig] = useState({
-    private_key: "",
-    local_address: "10.10.0.2/32",
-    mtu: 1420,
-    // Peer fields (single peer)
-    peer_address: "",
-    peer_port: 51820,
-    peer_public_key: "",
-    pre_shared_key: "",
-    allowed_ips: "0.0.0.0/0, ::/0",
-    keepalive_interval: 0,
-    reserved: "",
-  })
+  const flat = deriveFlat(initialConfig)
 
-  useEffect(() => {
-    if (isInitializedRef.current) return
-    if (initialConfig && initialConfig.type === "wireguard") {
-      // Support both new peers[] format and deprecated flat format
-      const peer = initialConfig.peers?.[0]
-      const peerAddress = peer?.address || initialConfig.server || ""
-      const peerPort = peer?.port || initialConfig.server_port || 51820
-      const peerPublicKey = peer?.public_key || initialConfig.peer_public_key || ""
-      const peerPreSharedKey = peer?.pre_shared_key || initialConfig.pre_shared_key || ""
-      const peerReserved = peer?.reserved || initialConfig.reserved
-      const peerAllowedIPs = peer?.allowed_ips
-      const peerKeepalive = peer?.persistent_keepalive_interval || 0
-      const localAddr = initialConfig.address?.[0] || initialConfig.local_address?.[0] || "10.10.0.2/32"
-
-      setWgConfig({
-        private_key: initialConfig.private_key || "",
-        local_address: typeof localAddr === "string" ? localAddr : "10.10.0.2/32",
-        mtu: initialConfig.mtu || 1420,
-        peer_address: peerAddress,
-        peer_port: peerPort,
-        peer_public_key: peerPublicKey,
-        pre_shared_key: peerPreSharedKey,
-        allowed_ips: Array.isArray(peerAllowedIPs) ? peerAllowedIPs.join(", ") : "0.0.0.0/0, ::/0",
-        keepalive_interval: peerKeepalive,
-        reserved: Array.isArray(peerReserved) ? peerReserved.join(",") : "",
-      })
-    }
-    isInitializedRef.current = true
-  }, [initialConfig])
-
-  useEffect(() => {
-    if (!isInitializedRef.current) return
-    // allow partial writes so JSON preview stays in sync
-
-    const peer: any = {
-      address: wgConfig.peer_address,
-      port: wgConfig.peer_port,
-      public_key: wgConfig.peer_public_key,
-    }
-    if (wgConfig.pre_shared_key) {
-      peer.pre_shared_key = wgConfig.pre_shared_key
-    }
-    if (wgConfig.allowed_ips) {
-      peer.allowed_ips = wgConfig.allowed_ips.split(",").map((s: string) => s.trim()).filter(Boolean)
-    }
-    if (wgConfig.keepalive_interval) {
-      peer.persistent_keepalive_interval = wgConfig.keepalive_interval
-    }
-    if (wgConfig.reserved) {
-      const reservedArr = wgConfig.reserved.split(",").map((s: string) => parseInt(s.trim())).filter((n: number) => !isNaN(n))
-      if (reservedArr.length === 3) {
-        peer.reserved = reservedArr
-      }
-    }
-
-    const previewConfig: any = {
-      type: "wireguard",
-      tag: "proxy_out",
-      address: [wgConfig.local_address],
-      private_key: wgConfig.private_key,
-      mtu: wgConfig.mtu,
-      peers: [peer],
-    }
-
-    setOutbound(0, previewConfig)
-  }, [wgConfig, setOutbound])
+  const updateOutbound = useCallback((patch: Partial<WgFlat>) => {
+    const merged = { ...flat, ...patch }
+    setOutbound(0, buildWgOutbound(merged))
+  }, [flat, setOutbound])
 
   return (
     <div className="space-y-6">
@@ -111,8 +100,8 @@ export function WireguardForm({ initialConfig, setOutbound }: OutboundFormProps)
           <div className="space-y-1.5">
             <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("localPrivateKey")}</Label>
             <Input
-              value={wgConfig.private_key}
-              onChange={(e) => setWgConfig({ ...wgConfig, private_key: e.target.value })}
+              value={flat.private_key}
+              onChange={(e) => updateOutbound({ private_key: e.target.value })}
               placeholder={t("enterPrivateKey")}
               className="h-9 text-sm font-mono"
             />
@@ -121,8 +110,8 @@ export function WireguardForm({ initialConfig, setOutbound }: OutboundFormProps)
             <div className="space-y-1.5">
               <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("localAddress")}</Label>
               <Input
-                value={wgConfig.local_address}
-                onChange={(e) => setWgConfig({ ...wgConfig, local_address: e.target.value })}
+                value={flat.local_address}
+                onChange={(e) => updateOutbound({ local_address: e.target.value })}
                 placeholder="10.10.0.2/32"
                 className="h-9 text-sm font-mono"
               />
@@ -131,8 +120,8 @@ export function WireguardForm({ initialConfig, setOutbound }: OutboundFormProps)
               <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">MTU</Label>
               <Input
                 type="number"
-                value={wgConfig.mtu}
-                onChange={(e) => setWgConfig({ ...wgConfig, mtu: parseInt(e.target.value) || 1420 })}
+                value={flat.mtu}
+                onChange={(e) => updateOutbound({ mtu: parseInt(e.target.value) || 1420 })}
                 className="h-9 text-sm"
               />
             </div>
@@ -158,8 +147,8 @@ export function WireguardForm({ initialConfig, setOutbound }: OutboundFormProps)
               <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("serverAddr")}</Label>
               <Input
                 placeholder="example.com"
-                value={wgConfig.peer_address}
-                onChange={(e) => setWgConfig({ ...wgConfig, peer_address: e.target.value })}
+                value={flat.peer_address}
+                onChange={(e) => updateOutbound({ peer_address: e.target.value })}
                 className="h-9 text-sm"
               />
             </div>
@@ -167,28 +156,28 @@ export function WireguardForm({ initialConfig, setOutbound }: OutboundFormProps)
               <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{tc("port")}</Label>
               <Input
                 type="number"
-                value={wgConfig.peer_port}
-                onChange={(e) => setWgConfig({ ...wgConfig, peer_port: parseInt(e.target.value) || 51820 })}
+                value={flat.peer_port}
+                onChange={(e) => updateOutbound({ peer_port: parseInt(e.target.value) || 51820 })}
                 className="h-9 text-sm"
               />
             </div>
           </div>
-          
+
           <div className="space-y-1.5">
             <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("serverPublicKey")}</Label>
             <Input
-              value={wgConfig.peer_public_key}
-              onChange={(e) => setWgConfig({ ...wgConfig, peer_public_key: e.target.value })}
+              value={flat.peer_public_key}
+              onChange={(e) => updateOutbound({ peer_public_key: e.target.value })}
               placeholder={t("serverPublicKeyPlaceholder")}
               className="h-9 text-sm font-mono"
             />
           </div>
-          
+
           <div className="space-y-1.5">
             <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("presharedKeyOptional")}</Label>
             <Input
-              value={wgConfig.pre_shared_key}
-              onChange={(e) => setWgConfig({ ...wgConfig, pre_shared_key: e.target.value })}
+              value={flat.pre_shared_key}
+              onChange={(e) => updateOutbound({ pre_shared_key: e.target.value })}
               placeholder="Pre-Shared Key"
               className="h-9 text-sm font-mono"
             />
@@ -198,8 +187,8 @@ export function WireguardForm({ initialConfig, setOutbound }: OutboundFormProps)
             <div className="space-y-1.5">
               <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("allowedIps")}</Label>
               <Input
-                value={wgConfig.allowed_ips}
-                onChange={(e) => setWgConfig({ ...wgConfig, allowed_ips: e.target.value })}
+                value={flat.allowed_ips}
+                onChange={(e) => updateOutbound({ allowed_ips: e.target.value })}
                 placeholder="0.0.0.0/0, ::/0"
                 className="h-9 text-sm font-mono"
               />
@@ -208,8 +197,8 @@ export function WireguardForm({ initialConfig, setOutbound }: OutboundFormProps)
               <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("keepaliveInterval")}</Label>
               <Input
                 type="number"
-                value={wgConfig.keepalive_interval}
-                onChange={(e) => setWgConfig({ ...wgConfig, keepalive_interval: parseInt(e.target.value) || 0 })}
+                value={flat.keepalive_interval}
+                onChange={(e) => updateOutbound({ keepalive_interval: parseInt(e.target.value) || 0 })}
                 placeholder="0"
                 className="h-9 text-sm"
               />
@@ -218,8 +207,8 @@ export function WireguardForm({ initialConfig, setOutbound }: OutboundFormProps)
             <div className="space-y-1.5">
               <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">Reserved (WARP)</Label>
               <Input
-                value={wgConfig.reserved}
-                onChange={(e) => setWgConfig({ ...wgConfig, reserved: e.target.value })}
+                value={flat.reserved}
+                onChange={(e) => updateOutbound({ reserved: e.target.value })}
                 placeholder="0,0,0"
                 className="h-9 text-sm font-mono"
               />
