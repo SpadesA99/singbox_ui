@@ -54,89 +54,90 @@ export function RoutingConfig({ showCard = true, availableOutbounds = EMPTY_OUTB
   const isInitializedRef = useRef(false)
 
   // Initialize from initialConfig (first load only)
+  // Note: we do NOT set isInitializedRef.current = true when initialConfig is absent,
+  // so that Effect 2 stays gated and we retry once the config actually arrives from the server.
   useEffect(() => {
     if (isInitializedRef.current) return
+    if (!initialConfig) return  // wait for config to load before initializing
 
-    if (initialConfig) {
-      if (initialConfig.final) {
-        setFinalOutbound(initialConfig.final)
-      }
-      if (initialConfig.default_domain_resolver) {
-        const resolver = initialConfig.default_domain_resolver
-        setDefaultDomainResolver(typeof resolver === "string" ? resolver : resolver.server || "")
-      }
-
-      // Reverse-parse existing rules into Passwall lists
-      const manualRules: RouteRule[] = []
-      const dDomains: string[] = []
-      const dIps: string[] = []
-      const pDomains: string[] = []
-      const pIps: string[] = []
-      const bDomains: string[] = []
-      const bIps: string[] = []
-
-      for (const rule of initialConfig.rules || []) {
-        let classified = false
-
-        // Detect preset rule_set rules
-        if (rule.rule_set?.length === 1) {
-          const rs = rule.rule_set[0]
-          if (rs === "geosite-category-ads-all" && rule.outbound === "block") {
-            setEnableBlockAds(true); classified = true
-          } else if (rs === "geosite-cn" && rule.outbound === "direct") {
-            setEnableCnDomain(true); classified = true
-          } else if (rs === "geoip-cn" && rule.outbound === "direct") {
-            setEnableCnIp(true); classified = true
-          } else if (rs === "geosite-gfw") {
-            setEnableGfw(true); classified = true
-          }
-        }
-
-        // Detect ip_is_private direct rule
-        if (!classified && rule.ip_is_private && rule.outbound === "direct") {
-          setEnablePrivateIpDirect(true); classified = true
-        }
-
-        // Detect simple domain/IP rules
-        if (!classified) {
-          const hasDomains = (rule.domain_suffix?.length || 0) > 0 || (rule.domain?.length || 0) > 0
-          const hasIps = (rule.ip_cidr?.length || 0) > 0
-          const isSimple = !rule.port && !rule.protocol && !rule.inbound &&
-            !rule.network && !rule.clash_mode && !rule.rule_set
-
-          if (isSimple && (hasDomains || hasIps) && rule.action === "route") {
-            const targetDomains = [...(rule.domain_suffix || []), ...(rule.domain || [])]
-            const targetIps = rule.ip_cidr || []
-
-            if (rule.outbound === "direct") {
-              dDomains.push(...targetDomains)
-              dIps.push(...targetIps)
-              classified = true
-            } else if (rule.outbound === "block") {
-              bDomains.push(...targetDomains)
-              bIps.push(...targetIps)
-              classified = true
-            } else if (rule.outbound && rule.outbound !== "direct" && rule.outbound !== "block") {
-              pDomains.push(...targetDomains)
-              pIps.push(...targetIps)
-              classified = true
-            }
-          }
-        }
-
-        if (!classified) {
-          manualRules.push(rule)
-        }
-      }
-
-      setDirectDomains(dDomains.join("\n"))
-      setDirectIps(dIps.join("\n"))
-      setProxyDomains(pDomains.join("\n"))
-      setProxyIps(pIps.join("\n"))
-      setBlockDomains(bDomains.join("\n"))
-      setBlockIps(bIps.join("\n"))
-      setRules(manualRules)
+    if (initialConfig.final) {
+      setFinalOutbound(initialConfig.final)
     }
+    if (initialConfig.default_domain_resolver) {
+      const resolver = initialConfig.default_domain_resolver
+      setDefaultDomainResolver(typeof resolver === "string" ? resolver : resolver.server || "")
+    }
+
+    // Reverse-parse existing rules into Passwall lists
+    const manualRules: RouteRule[] = []
+    const dDomains: string[] = []
+    const dIps: string[] = []
+    const pDomains: string[] = []
+    const pIps: string[] = []
+    const bDomains: string[] = []
+    const bIps: string[] = []
+
+    for (const rule of initialConfig.rules || []) {
+      let classified = false
+
+      // Detect preset rule_set rules
+      if (rule.rule_set?.length === 1) {
+        const rs = rule.rule_set[0]
+        if (rs === "geosite-category-ads-all" && rule.outbound === "block") {
+          setEnableBlockAds(true); classified = true
+        } else if (rs === "geosite-cn" && rule.outbound === "direct") {
+          setEnableCnDomain(true); classified = true
+        } else if (rs === "geoip-cn" && rule.outbound === "direct") {
+          setEnableCnIp(true); classified = true
+        } else if (rs === "geosite-gfw") {
+          setEnableGfw(true); classified = true
+        }
+      }
+
+      // Detect ip_is_private direct rule
+      if (!classified && rule.ip_is_private && rule.outbound === "direct") {
+        setEnablePrivateIpDirect(true); classified = true
+      }
+
+      // Detect simple domain/IP rules
+      if (!classified) {
+        const hasDomains = (rule.domain_suffix?.length || 0) > 0 || (rule.domain?.length || 0) > 0
+        const hasIps = (rule.ip_cidr?.length || 0) > 0
+        const isSimple = !rule.port && !rule.protocol && !rule.inbound &&
+          !rule.network && !rule.clash_mode && !rule.rule_set
+
+        if (isSimple && (hasDomains || hasIps) && rule.action === "route") {
+          const targetDomains = [...(rule.domain_suffix || []), ...(rule.domain || [])]
+          const targetIps = rule.ip_cidr || []
+
+          if (rule.outbound === "direct") {
+            dDomains.push(...targetDomains)
+            dIps.push(...targetIps)
+            classified = true
+          } else if (rule.outbound === "block") {
+            bDomains.push(...targetDomains)
+            bIps.push(...targetIps)
+            classified = true
+          } else if (rule.outbound && rule.outbound !== "direct" && rule.outbound !== "block") {
+            pDomains.push(...targetDomains)
+            pIps.push(...targetIps)
+            classified = true
+          }
+        }
+      }
+
+      if (!classified) {
+        manualRules.push(rule)
+      }
+    }
+
+    setDirectDomains(dDomains.join("\n"))
+    setDirectIps(dIps.join("\n"))
+    setProxyDomains(pDomains.join("\n"))
+    setProxyIps(pIps.join("\n"))
+    setBlockDomains(bDomains.join("\n"))
+    setBlockIps(bIps.join("\n"))
+    setRules(manualRules)
 
     isInitializedRef.current = true
   }, [initialConfig])

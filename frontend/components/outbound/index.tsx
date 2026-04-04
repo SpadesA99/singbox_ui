@@ -61,6 +61,9 @@ export function OutboundConfig({ showCard = true }: OutboundConfigProps) {
 
   const isInitializedRef = useRef(false)
   const prevSelectedNodeRef = useRef<ProxyNode | null>(null)
+  // Track whether a tab change was user-initiated vs. derived from loaded config.
+  // Prevents the subscription branch from overwriting a loaded protocol config on init.
+  const hasUserChangedTabRef = useRef(false)
 
   // Subscription state
   const [subscriptions, setSubscriptions] = useState<SubscriptionEntry[]>([])
@@ -77,6 +80,10 @@ export function OutboundConfig({ showCard = true }: OutboundConfigProps) {
     if (isInitializedRef.current) return
     if (initialConfig && initialConfig.type) {
       setOutboundType(initialConfig.type)
+      // A specific protocol is loaded — don't let the subscription branch overwrite it
+    } else {
+      // No loaded config: subscription tab is the correct default, allow it to set direct
+      hasUserChangedTabRef.current = true
     }
     isInitializedRef.current = true
   }, [initialConfig])
@@ -116,7 +123,9 @@ export function OutboundConfig({ showCard = true }: OutboundConfigProps) {
         const outboundWithProxyTag = { ...selectedNode.outbound, tag: "proxy_out" } as any
         setOutbound(0, outboundWithProxyTag)
         prevSelectedNodeRef.current = selectedNode
-      } else if (!selectedNode) {
+      } else if (!selectedNode && hasUserChangedTabRef.current) {
+        // Only reset to direct when the user explicitly switched to subscription tab.
+        // Skipping this during initialization prevents overwriting a loaded protocol config.
         setOutbound(0, { type: "direct", tag: "proxy_out" })
       }
     } else {
@@ -204,7 +213,7 @@ export function OutboundConfig({ showCard = true }: OutboundConfigProps) {
 
   const content = (
     <div className="space-y-6">
-      <Tabs value={outboundType} onValueChange={setOutboundType} className="w-full">
+      <Tabs value={outboundType} onValueChange={(value) => { hasUserChangedTabRef.current = true; setOutboundType(value) }} className="w-full">
         <TabsList className="flex flex-wrap h-auto w-full justify-start gap-1 p-1 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-sm">
           <TabsTrigger className={tabTriggerClass} value="subscription">{t("subscription")}</TabsTrigger>
           <TabsTrigger className={tabTriggerClass} value="direct">{t("direct")}</TabsTrigger>
