@@ -43,7 +43,7 @@ export function HttpForm({ initialConfig, setOutbound }: OutboundFormProps) {
 
   useEffect(() => {
     if (!isInitializedRef.current) return
-    if (!httpConfig.server) return
+    // allow partial writes so JSON preview stays in sync
 
     const previewConfig: any = {
       type: "http",

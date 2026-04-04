@@ -40,7 +40,7 @@ export function SocksForm({ initialConfig, setOutbound }: OutboundFormProps) {
 
   useEffect(() => {
     if (!isInitializedRef.current) return
-    if (!socksConfig.server) return
+    // allow partial writes so JSON preview stays in sync
 
     const previewConfig: any = {
       type: "socks",

@@ -97,7 +97,7 @@ export function VlessForm({ initialConfig, setOutbound }: OutboundFormProps) {
   // Build and push config to store
   useEffect(() => {
     if (!isInitializedRef.current) return
-    if (!vlessConfig.server || !vlessConfig.uuid) return
+    // allow partial writes so JSON preview stays in sync
 
     const previewConfig: any = {
       type: "vless",

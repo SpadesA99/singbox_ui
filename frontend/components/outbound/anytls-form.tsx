@@ -48,7 +48,7 @@ export function AnytlsForm({ initialConfig, setOutbound }: OutboundFormProps) {
 
   useEffect(() => {
     if (!isInitializedRef.current) return
-    if (!anytlsConfig.server || !anytlsConfig.password) return
+    // allow partial writes so JSON preview stays in sync
 
     const previewConfig: any = {
       type: "anytls",

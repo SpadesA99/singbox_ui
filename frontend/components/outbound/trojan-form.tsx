@@ -85,7 +85,7 @@ export function TrojanForm({ initialConfig, setOutbound }: OutboundFormProps) {
   // Build and push config to store
   useEffect(() => {
     if (!isInitializedRef.current) return
-    if (!trojanConfig.server || !trojanConfig.password) return
+    // allow partial writes so JSON preview stays in sync
 
     const previewConfig: any = {
       type: "trojan",

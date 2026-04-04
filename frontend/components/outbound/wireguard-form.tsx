@@ -58,7 +58,7 @@ export function WireguardForm({ initialConfig, setOutbound }: OutboundFormProps)
 
   useEffect(() => {
     if (!isInitializedRef.current) return
-    if (!wgConfig.private_key || !wgConfig.peer_public_key || !wgConfig.peer_address) return
+    // allow partial writes so JSON preview stays in sync
 
     const peer: any = {
       address: wgConfig.peer_address,

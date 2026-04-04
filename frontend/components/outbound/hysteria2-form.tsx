@@ -52,7 +52,7 @@ export function Hysteria2Form({ initialConfig, setOutbound }: OutboundFormProps)
 
   useEffect(() => {
     if (!isInitializedRef.current) return
-    if (!hy2Config.server || !hy2Config.password) return
+    // allow partial writes so JSON preview stays in sync
 
     const previewConfig: any = {
       type: "hysteria2",

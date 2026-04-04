@@ -61,7 +61,7 @@ export function ShadowsocksForm({ initialConfig, setOutbound }: OutboundFormProp
 
   useEffect(() => {
     if (!isInitializedRef.current) return
-    if (!ssConfig.server || !ssConfig.password) return
+    // allow partial writes so JSON preview stays in sync
 
     const previewConfig: any = {
       type: "shadowsocks",

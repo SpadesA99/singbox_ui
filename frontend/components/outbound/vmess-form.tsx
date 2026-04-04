@@ -97,7 +97,7 @@ export function VmessForm({ initialConfig, setOutbound }: OutboundFormProps) {
   // Build and push config to store
   useEffect(() => {
     if (!isInitializedRef.current) return
-    if (!vmessConfig.server || !vmessConfig.uuid) return
+    // allow partial writes so JSON preview stays in sync
 
     const previewConfig: any = {
       type: "vmess",
