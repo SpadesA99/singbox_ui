@@ -41,6 +41,8 @@ interface OutboundConfigProps {
   showCard?: boolean
 }
 
+const tabTriggerClass = "rounded-lg px-4 py-2 text-sm font-medium data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-foreground dark:data-[state=active]:text-zinc-100 data-[state=active]:shadow-sm transition-all"
+
 // Generate canonical node tag matching backend format
 function generateNodeTag(type: string, address: string, port: number): string {
   const safeAddress = address.replace(/\./g, '_').replace(/:/g, '_').replace(/-/g, '_')
@@ -196,27 +198,27 @@ export function OutboundConfig({ showCard = true }: OutboundConfigProps) {
   const formProps = { initialConfig, setOutbound }
 
   const content = (
-    <div className="space-y-4">
-          <Tabs value={outboundType} onValueChange={setOutboundType} className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="subscription">{t("subscription")}</TabsTrigger>
-              <TabsTrigger value="direct">{t("direct")}</TabsTrigger>
-              <TabsTrigger value="vless">VLESS</TabsTrigger>
-              <TabsTrigger value="vmess">VMess</TabsTrigger>
-              <TabsTrigger value="trojan">Trojan</TabsTrigger>
-            </TabsList>
-            <TabsList className="grid w-full grid-cols-7 mt-2">
-              <TabsTrigger value="shadowsocks">Shadowsocks</TabsTrigger>
-              <TabsTrigger value="hysteria2">Hysteria2</TabsTrigger>
-              <TabsTrigger value="anytls">AnyTLS</TabsTrigger>
-              <TabsTrigger value="wireguard">WireGuard</TabsTrigger>
-              <TabsTrigger value="socks">Socks</TabsTrigger>
-              <TabsTrigger value="http">HTTP</TabsTrigger>
-              <TabsTrigger value="block">{t("block")}</TabsTrigger>
-            </TabsList>
+    <div className="space-y-6">
+      <Tabs value={outboundType} onValueChange={setOutboundType} className="w-full">
+        <TabsList className="flex flex-wrap h-auto w-full justify-start gap-1 p-1 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-sm">
+          <TabsTrigger className={tabTriggerClass} value="subscription">{t("subscription")}</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="direct">{t("direct")}</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="block">{t("block")}</TabsTrigger>
+          <div className="w-px h-6 bg-zinc-300 dark:bg-zinc-700 mx-1 self-center"></div>
+          <TabsTrigger className={tabTriggerClass} value="vless">VLESS</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="vmess">VMess</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="trojan">Trojan</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="shadowsocks">Shadowsocks</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="hysteria2">Hysteria2</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="anytls">AnyTLS</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="wireguard">WireGuard</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="socks">Socks</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="http">HTTP</TabsTrigger>
+        </TabsList>
 
+        <div className="pt-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
             {/* Subscription node selection */}
-            <TabsContent value="subscription" className="space-y-4">
+            <TabsContent value="subscription" className="space-y-4 m-0">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">
                   {t("summaryText", { subCount: subscriptions.length, nodeCount: totalNodes })}
@@ -380,7 +382,8 @@ export function OutboundConfig({ showCard = true }: OutboundConfigProps) {
             <TabsContent value="shadowsocks"><ShadowsocksForm {...formProps} /></TabsContent>
             <TabsContent value="hysteria2"><Hysteria2Form {...formProps} /></TabsContent>
             <TabsContent value="anytls"><AnytlsForm {...formProps} /></TabsContent>
-          </Tabs>
+          </div>
+        </Tabs>
 
       {error && (
         <div className="mt-4 p-3 text-sm text-destructive bg-destructive/10 rounded-md">{error}</div>

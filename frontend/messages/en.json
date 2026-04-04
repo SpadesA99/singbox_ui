@@ -139,7 +139,8 @@
     "instanceLogsDesc": "View log output of the running instance",
     "noLogs": "No logs yet",
     "loadingLogs": "Loading logs...",
-    "getLogsFailed": "Failed to get logs"
+    "getLogsFailed": "Failed to get logs",
+    "configuration": "Configuration"
   },
   "subscription": {
     "defaultBrowser": "Default Browser",
@@ -428,7 +429,10 @@
     "userName": "Username",
     "zeroRttHandshake": "0-RTT Handshake",
     "quicCongestionControl": "QUIC Congestion Control",
-    "defaultAuto": "Default (Auto)"
+    "defaultAuto": "Default (Auto)",
+    "configuration": "Configuration",
+    "tlsConfiguration": "TLS Configuration",
+    "managePeers": "Manage WireGuard client peers."
   },
   "outbound": {
     "title": "Outbound Config",

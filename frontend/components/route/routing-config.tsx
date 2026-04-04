@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { Route } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -142,6 +142,9 @@ export function RoutingConfig({ showCard = true, availableOutbounds = EMPTY_OUTB
   }, [initialConfig])
 
   // Sync to global store on every state change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // config.dns is intentionally omitted to avoid re-initialization loops;
+  // we only want to capture the initial value once.
   useEffect(() => {
     if (!isInitializedRef.current) return
 
@@ -275,72 +278,77 @@ export function RoutingConfig({ showCard = true, availableOutbounds = EMPTY_OUTB
   const content = (
     <div className="space-y-4">
       {/* Route mode selector */}
-      <div className="space-y-2">
-        <Label>{t("routeMode")}</Label>
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { value: "global_proxy" as const, label: t("globalProxy") },
-            { value: "global_direct" as const, label: t("globalDirect") },
-            { value: "rules" as const, label: t("ruleRouting") },
-          ].map((mode) => (
-            <Button
-              key={mode.value}
-              type="button"
-              variant={routeMode === mode.value ? "default" : "outline"}
-              size="sm"
-              onClick={() => setRouteMode(mode.value)}
-              className="w-full"
-            >
-              {mode.label}
-            </Button>
-          ))}
+      <div className="space-y-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
+        <div className="space-y-2">
+          <Label>{t("routeMode")}</Label>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { value: "global_proxy" as const, label: t("globalProxy") },
+              { value: "global_direct" as const, label: t("globalDirect") },
+              { value: "rules" as const, label: t("ruleRouting") },
+            ].map((mode) => (
+              <Button
+                key={mode.value}
+                type="button"
+                variant={routeMode === mode.value ? "default" : "outline"}
+                size="sm"
+                onClick={() => setRouteMode(mode.value)}
+                className="w-full"
+              >
+                {mode.label}
+              </Button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {routeMode === "global_proxy" && t("globalProxyDesc")}
+            {routeMode === "global_direct" && t("globalDirectDesc")}
+            {routeMode === "rules" && t("ruleRoutingDesc")}
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {routeMode === "global_proxy" && t("globalProxyDesc")}
-          {routeMode === "global_direct" && t("globalDirectDesc")}
-          {routeMode === "rules" && t("ruleRoutingDesc")}
-        </p>
       </div>
 
       {/* Rule split mode: final outbound + domain resolver + tab lists */}
       {routeMode === "rules" && (
         <>
-          <div className="space-y-2">
-            <Label>{t("finalOutbound")} (final)</Label>
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              value={finalOutbound}
-              onChange={(e) => setFinalOutbound(e.target.value)}
-            >
-              {availableOutbounds.length > 0 ? (
-                availableOutbounds.map((tag) => (
-                  <option key={tag} value={tag}>
-                    {tag}
-                  </option>
-                ))
-              ) : (
-                <>
-                  <option value="proxy_out">proxy_out</option>
-                  <option value="direct">direct</option>
-                  <option value="block">block</option>
-                </>
-              )}
-            </select>
-            <p className="text-xs text-muted-foreground">{t("finalOutboundDesc")}</p>
+          <div className="space-y-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
+            <div className="space-y-2">
+              <Label>{t("finalOutbound")} (final)</Label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={finalOutbound}
+                onChange={(e) => setFinalOutbound(e.target.value)}
+              >
+                {availableOutbounds.length > 0 ? (
+                  availableOutbounds.map((tag) => (
+                    <option key={tag} value={tag}>
+                      {tag}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="proxy_out">proxy_out</option>
+                    <option value="direct">direct</option>
+                    <option value="block">block</option>
+                  </>
+                )}
+              </select>
+              <p className="text-xs text-muted-foreground">{t("finalOutboundDesc")}</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t("domainResolverLabel")}</Label>
+              <Input
+                placeholder={t("domainResolverPlaceholder")}
+                value={defaultDomainResolver}
+                onChange={(e) => setDefaultDomainResolver(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">{t("domainResolverDesc")}</p>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>{t("domainResolverLabel")}</Label>
-            <Input
-              placeholder={t("domainResolverPlaceholder")}
-              value={defaultDomainResolver}
-              onChange={(e) => setDefaultDomainResolver(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">{t("domainResolverDesc")}</p>
-          </div>
-
-          <div className="space-y-3">
-            <Label>{t("routingRules")}</Label>
+          <div className="space-y-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
+            <div className="space-y-3">
+              <Label>{t("routingRules")}</Label>
             <p className="text-xs text-muted-foreground">{t("rulePriority")}</p>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-3">
@@ -397,6 +405,7 @@ export function RoutingConfig({ showCard = true, availableOutbounds = EMPTY_OUTB
                 <CnIpTab enableCnIp={enableCnIp} setEnableCnIp={setEnableCnIp} />
               </TabsContent>
             </Tabs>
+            </div>
           </div>
         </>
       )}
@@ -408,12 +417,17 @@ export function RoutingConfig({ showCard = true, availableOutbounds = EMPTY_OUTB
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("title")}</CardTitle>
-        <CardDescription>{t("description")}</CardDescription>
-      </CardHeader>
-      <CardContent>{content}</CardContent>
-    </Card>
+    <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative transition-all duration-300">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-500 text-white shadow-sm">
+          <Route className="w-5 h-5" />
+        </div>
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">{t("title")}</h2>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{t("description")}</p>
+        </div>
+      </div>
+      {content}
+    </div>
   )
 }

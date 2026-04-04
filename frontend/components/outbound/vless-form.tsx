@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { useTranslation } from "@/lib/i18n"
 import { OutboundFormProps, extractTransportHost } from "./types"
+import { Zap, Globe, Server, ShieldCheck } from "lucide-react"
 
 export function VlessForm({ initialConfig, setOutbound }: OutboundFormProps) {
   const { t } = useTranslation("outbound")
@@ -201,415 +203,469 @@ export function VlessForm({ initialConfig, setOutbound }: OutboundFormProps) {
   }, [vlessConfig, setOutbound])
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>{t("serverAddr")}</Label>
-          <Input
-            placeholder="example.com"
-            value={vlessConfig.server}
-            onChange={(e) => setVlessConfig({ ...vlessConfig, server: e.target.value })}
-          />
+    <div className="space-y-6">
+      {/* Server Settings */}
+      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative group transition-all duration-300">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500">
+            <Server className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-base font-semibold">{t("serverAddr")}</h3>
+            <p className="text-xs text-muted-foreground">{t("serverSettingsDesc") || "Basic connection details"}</p>
+          </div>
         </div>
-        <div className="space-y-2">
-          <Label>{tc("port")}</Label>
-          <Input
-            type="number"
-            value={vlessConfig.server_port}
-            onChange={(e) => setVlessConfig({ ...vlessConfig, server_port: parseInt(e.target.value) || 443 })}
-          />
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Label>UUID</Label>
-        <Input
-          placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-          value={vlessConfig.uuid}
-          onChange={(e) => setVlessConfig({ ...vlessConfig, uuid: e.target.value })}
-        />
-      </div>
-      <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Label>{t("flow")}</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={vlessConfig.flow}
-            onChange={(e) => setVlessConfig({ ...vlessConfig, flow: e.target.value })}
-          >
-            <option value="">{t("noneDefault")}</option>
-            <option value="xtls-rprx-vision">{t("xtlsVisionRecommended")}</option>
-          </select>
-        </div>
-        <div className="space-y-2">
-          <Label>{t("networkType")}</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={vlessConfig.network}
-            onChange={(e) => setVlessConfig({ ...vlessConfig, network: e.target.value })}
-          >
-            <option value="">{t("tcpAndUdp")}</option>
-            <option value="tcp">TCP</option>
-            <option value="udp">UDP</option>
-          </select>
-        </div>
-        <div className="space-y-2">
-          <Label>{t("packetEncoding")}</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={vlessConfig.packet_encoding}
-            onChange={(e) => setVlessConfig({ ...vlessConfig, packet_encoding: e.target.value })}
-          >
-            <option value="">{tc("disabled")}</option>
-            <option value="xudp">xudp</option>
-            <option value="packetaddr">packetaddr</option>
-          </select>
-        </div>
-      </div>
 
-      {/* TLS */}
-      <div className="border-t pt-4 mt-4">
-        <div className="flex items-center gap-4 mb-4">
-          <Label className="font-semibold">{t("tlsSettings")}</Label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={vlessConfig.tls_enabled}
-              onChange={(e) => setVlessConfig({ ...vlessConfig, tls_enabled: e.target.checked })}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            {t("enableTls")}
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={vlessConfig.tls_insecure}
-              onChange={(e) => setVlessConfig({ ...vlessConfig, tls_insecure: e.target.checked })}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            {t("insecure")}
-          </label>
-        </div>
-        {vlessConfig.tls_enabled && (
+        <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>{t("sniServerName")}</Label>
-              <Input
-                placeholder={t("sniPlaceholder")}
-                value={vlessConfig.tls_server_name}
-                onChange={(e) => setVlessConfig({ ...vlessConfig, tls_server_name: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>ALPN</Label>
-              <Input
-                placeholder="h2,http/1.1"
-                value={vlessConfig.tls_alpn}
-                onChange={(e) => setVlessConfig({ ...vlessConfig, tls_alpn: e.target.value })}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Fragment & ECH */}
-      {vlessConfig.tls_enabled && (
-        <div className="border-t pt-4">
-          <div className="flex items-center gap-4 mb-4">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={vlessConfig.tls_fragment}
-                onChange={(e) => setVlessConfig({ ...vlessConfig, tls_fragment: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              {t("tlsFragment")}
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={vlessConfig.tls_record_fragment}
-                onChange={(e) => setVlessConfig({ ...vlessConfig, tls_record_fragment: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              {t("tlsRecordFragment")}
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={vlessConfig.ech_enabled}
-                onChange={(e) => setVlessConfig({ ...vlessConfig, ech_enabled: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              ECH
-            </label>
-          </div>
-          {vlessConfig.ech_enabled && (
-            <div className="space-y-2">
-              <Label>{t("echConfig")}</Label>
-              <textarea
-                className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
-                rows={2}
-                value={vlessConfig.ech_config}
-                onChange={(e) => setVlessConfig({ ...vlessConfig, ech_config: e.target.value })}
-                placeholder={t("echConfigHint")}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* uTLS (only when TLS enabled and Reality disabled) */}
-      {vlessConfig.tls_enabled && !vlessConfig.reality_enabled && (
-        <div className="border-t pt-4">
-          <div className="flex items-center gap-4 mb-4">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={vlessConfig.utls_enabled}
-                onChange={(e) => setVlessConfig({ ...vlessConfig, utls_enabled: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              {t("enableUtls")}
-            </label>
-          </div>
-          {vlessConfig.utls_enabled && (
-            <div className="space-y-2">
-              <Label>{t("browserFingerprint")}</Label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={vlessConfig.utls_fingerprint}
-                onChange={(e) => setVlessConfig({ ...vlessConfig, utls_fingerprint: e.target.value })}
-              >
-                <option value="chrome">Chrome</option>
-                <option value="firefox">Firefox</option>
-                <option value="safari">Safari</option>
-                <option value="edge">Edge</option>
-                <option value="ios">iOS</option>
-                <option value="android">Android</option>
-                <option value="random">{t("random")}</option>
-                <option value="randomized">{t("randomized")}</option>
-              </select>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Reality */}
-      {vlessConfig.tls_enabled && (
-        <div className="border-t pt-4">
-          <div className="flex items-center gap-4 mb-4">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={vlessConfig.reality_enabled}
-                onChange={(e) => setVlessConfig({ ...vlessConfig, reality_enabled: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              {t("enableReality")}
-            </label>
-          </div>
-          {vlessConfig.reality_enabled && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>{t("utlsFingerprintRequired")}</Label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={vlessConfig.utls_fingerprint}
-                  onChange={(e) => setVlessConfig({ ...vlessConfig, utls_fingerprint: e.target.value })}
-                >
-                  <option value="chrome">Chrome</option>
-                  <option value="firefox">Firefox</option>
-                  <option value="safari">Safari</option>
-                  <option value="edge">Edge</option>
-                  <option value="ios">iOS</option>
-                  <option value="android">Android</option>
-                  <option value="random">{t("random")}</option>
-                  <option value="randomized">{t("randomized")}</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>{t("realityPublicKey")}</Label>
-                  <Input
-                    placeholder={t("serverPublicKeyPlaceholder")}
-                    value={vlessConfig.reality_public_key}
-                    onChange={(e) => setVlessConfig({ ...vlessConfig, reality_public_key: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Short ID</Label>
-                  <Input
-                    placeholder="0123456789abcdef"
-                    value={vlessConfig.reality_short_id}
-                    onChange={(e) => setVlessConfig({ ...vlessConfig, reality_short_id: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Transport */}
-      <div className="border-t pt-4">
-        <div className="space-y-2 mb-4">
-          <Label className="font-semibold">{t("transport")}</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={vlessConfig.transport_type}
-            onChange={(e) => setVlessConfig({ ...vlessConfig, transport_type: e.target.value })}
-          >
-            <option value="">{t("tcpDefault")}</option>
-            <option value="ws">WebSocket</option>
-            <option value="grpc">gRPC</option>
-            <option value="http">HTTP/2</option>
-            <option value="httpupgrade">HTTPUpgrade</option>
-          </select>
-        </div>
-        {(vlessConfig.transport_type === "ws" || vlessConfig.transport_type === "http" || vlessConfig.transport_type === "httpupgrade") && (
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>{t("path")}</Label>
-              <Input
-                placeholder="/"
-                value={vlessConfig.transport_path}
-                onChange={(e) => setVlessConfig({ ...vlessConfig, transport_path: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{t("host")}</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("serverAddr")}</Label>
               <Input
                 placeholder="example.com"
-                value={vlessConfig.transport_host}
-                onChange={(e) => setVlessConfig({ ...vlessConfig, transport_host: e.target.value })}
+                value={vlessConfig.server}
+                onChange={(e) => setVlessConfig({ ...vlessConfig, server: e.target.value })}
+                className="h-9 text-sm"
               />
             </div>
-          </div>
-        )}
-        {vlessConfig.transport_type === "ws" && (
-          <div className="grid grid-cols-2 gap-4 mt-2">
-            <div className="space-y-2">
-              <Label>{t("maxEarlyData")}</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{tc("port")}</Label>
               <Input
                 type="number"
-                value={vlessConfig.ws_max_early_data}
-                onChange={(e) => setVlessConfig({ ...vlessConfig, ws_max_early_data: parseInt(e.target.value) || 0 })}
-                placeholder="0"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{t("earlyDataHeader")}</Label>
-              <Input
-                value={vlessConfig.ws_early_data_header}
-                onChange={(e) => setVlessConfig({ ...vlessConfig, ws_early_data_header: e.target.value })}
-                placeholder="Sec-WebSocket-Protocol"
+                value={vlessConfig.server_port}
+                onChange={(e) => setVlessConfig({ ...vlessConfig, server_port: parseInt(e.target.value) || 443 })}
+                className="h-9 text-sm"
               />
             </div>
           </div>
-        )}
-        {vlessConfig.transport_type === "grpc" && (
-          <div className="space-y-2">
-            <Label>{t("serviceName")}</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">UUID</Label>
             <Input
-              placeholder="grpc_service"
-              value={vlessConfig.transport_service_name}
-              onChange={(e) => setVlessConfig({ ...vlessConfig, transport_service_name: e.target.value })}
+              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              value={vlessConfig.uuid}
+              onChange={(e) => setVlessConfig({ ...vlessConfig, uuid: e.target.value })}
+              className="h-9 text-sm"
             />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("flow")}</Label>
+              <Select value={(vlessConfig.flow) || "none"} onValueChange={(val) => { setVlessConfig({ ...vlessConfig, flow: (val === "none" ? "" : val)  }) }}>
+                <SelectTrigger className="h-9 w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-primary/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t("noneDefault")}</SelectItem>
+                  <SelectItem value="xtls-rprx-vision">{t("xtlsVisionRecommended")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("networkType")}</Label>
+              <Select value={(vlessConfig.network) || "none"} onValueChange={(val) => { setVlessConfig({ ...vlessConfig, network: (val === "none" ? "" : val)  }) }}>
+                <SelectTrigger className="h-9 w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-primary/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t("tcpAndUdp")}</SelectItem>
+                  <SelectItem value="tcp">TCP</SelectItem>
+                  <SelectItem value="udp">UDP</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("packetEncoding")}</Label>
+              <Select value={(vlessConfig.packet_encoding) || "none"} onValueChange={(val) => { setVlessConfig({ ...vlessConfig, packet_encoding: (val === "none" ? "" : val)  }) }}>
+                <SelectTrigger className="h-9 w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-primary/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{tc("disabled")}</SelectItem>
+                  <SelectItem value="xudp">xudp</SelectItem>
+                  <SelectItem value="packetaddr">packetaddr</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* TLS Settings */}
+      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative group transition-all duration-300">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-500">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold">{t("tlsSettings")}</h3>
+              <p className="text-xs text-muted-foreground">{t("tlsSettingsDesc") || "Security and encryption options"}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer group/label">
+              <input
+                type="checkbox"
+                checked={vlessConfig.tls_enabled}
+                onChange={(e) => setVlessConfig({ ...vlessConfig, tls_enabled: e.target.checked })}
+                className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500 transition-colors"
+              />
+              <span className="text-sm font-medium group-hover/label:text-blue-500 transition-colors">{t("enableTls")}</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer group/label">
+              <input
+                type="checkbox"
+                checked={vlessConfig.tls_insecure}
+                onChange={(e) => setVlessConfig({ ...vlessConfig, tls_insecure: e.target.checked })}
+                className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500 transition-colors"
+              />
+              <span className="text-sm font-medium group-hover/label:text-blue-500 transition-colors">{t("insecure")}</span>
+            </label>
+          </div>
+        </div>
+
+        {vlessConfig.tls_enabled && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("sniServerName")}</Label>
+                <Input
+                  placeholder={t("sniPlaceholder")}
+                  value={vlessConfig.tls_server_name}
+                  onChange={(e) => setVlessConfig({ ...vlessConfig, tls_server_name: e.target.value })}
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">ALPN</Label>
+                <Input
+                  placeholder="h2,http/1.1"
+                  value={vlessConfig.tls_alpn}
+                  onChange={(e) => setVlessConfig({ ...vlessConfig, tls_alpn: e.target.value })}
+                  className="h-9 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50 space-y-4">
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer group/label">
+                  <input
+                    type="checkbox"
+                    checked={vlessConfig.tls_fragment}
+                    onChange={(e) => setVlessConfig({ ...vlessConfig, tls_fragment: e.target.checked })}
+                    className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium group-hover/label:text-blue-500 transition-colors">{t("tlsFragment")}</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer group/label">
+                  <input
+                    type="checkbox"
+                    checked={vlessConfig.tls_record_fragment}
+                    onChange={(e) => setVlessConfig({ ...vlessConfig, tls_record_fragment: e.target.checked })}
+                    className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium group-hover/label:text-blue-500 transition-colors">{t("tlsRecordFragment")}</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer group/label">
+                  <input
+                    type="checkbox"
+                    checked={vlessConfig.ech_enabled}
+                    onChange={(e) => setVlessConfig({ ...vlessConfig, ech_enabled: e.target.checked })}
+                    className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium group-hover/label:text-blue-500 transition-colors">ECH</span>
+                </label>
+              </div>
+
+              {vlessConfig.ech_enabled && (
+                <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("echConfig")}</Label>
+                  <textarea
+                    className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    rows={2}
+                    value={vlessConfig.ech_config}
+                    onChange={(e) => setVlessConfig({ ...vlessConfig, ech_config: e.target.value })}
+                    placeholder={t("echConfigHint")}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Reality & uTLS */}
+            <div className="p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50 space-y-4">
+              <div className="flex items-center gap-6">
+                {!vlessConfig.reality_enabled && (
+                  <label className="flex items-center gap-2 cursor-pointer group/label">
+                    <input
+                      type="checkbox"
+                      checked={vlessConfig.utls_enabled}
+                      onChange={(e) => setVlessConfig({ ...vlessConfig, utls_enabled: e.target.checked })}
+                      className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium group-hover/label:text-blue-500 transition-colors">{t("enableUtls")}</span>
+                  </label>
+                )}
+                <label className="flex items-center gap-2 cursor-pointer group/label">
+                  <input
+                    type="checkbox"
+                    checked={vlessConfig.reality_enabled}
+                    onChange={(e) => setVlessConfig({ ...vlessConfig, reality_enabled: e.target.checked })}
+                    className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium group-hover/label:text-blue-500 transition-colors">{t("enableReality")}</span>
+                </label>
+              </div>
+
+              {(vlessConfig.utls_enabled || vlessConfig.reality_enabled) && (
+                <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("browserFingerprint")}</Label>
+                    <Select value={(vlessConfig.utls_fingerprint) || "none"} onValueChange={(val) => { setVlessConfig({ ...vlessConfig, utls_fingerprint: (val === "none" ? "" : val)  }) }}>
+                <SelectTrigger className="h-9 w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-primary/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="chrome">Chrome</SelectItem>
+                  <SelectItem value="firefox">Firefox</SelectItem>
+                  <SelectItem value="safari">Safari</SelectItem>
+                  <SelectItem value="edge">Edge</SelectItem>
+                  <SelectItem value="ios">iOS</SelectItem>
+                  <SelectItem value="android">Android</SelectItem>
+                  <SelectItem value="random">{t("random")}</SelectItem>
+                  <SelectItem value="randomized">{t("randomized")}</SelectItem>
+                </SelectContent>
+              </Select>
+                  </div>
+                </div>
+              )}
+
+              {vlessConfig.reality_enabled && (
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-zinc-200/50 dark:border-zinc-800/50 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("realityPublicKey")}</Label>
+                    <Input
+                      placeholder={t("serverPublicKeyPlaceholder")}
+                      value={vlessConfig.reality_public_key}
+                      onChange={(e) => setVlessConfig({ ...vlessConfig, reality_public_key: e.target.value })}
+                      className="h-9 text-sm font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">Short ID</Label>
+                    <Input
+                      placeholder="0123456789abcdef"
+                      value={vlessConfig.reality_short_id}
+                      onChange={(e) => setVlessConfig({ ...vlessConfig, reality_short_id: e.target.value })}
+                      className="h-9 text-sm font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Multiplex */}
-      <div className="border-t pt-4">
-        <div className="flex items-center gap-4 mb-4">
-          <Label className="font-semibold">{t("multiplexSettings")}</Label>
-          <label className="flex items-center gap-2 text-sm">
+      {/* Transport Settings */}
+      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative group transition-all duration-300">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-xl bg-orange-500/10 text-orange-500">
+            <Globe className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-base font-semibold">{t("transport")}</h3>
+            <p className="text-xs text-muted-foreground">{t("transportDesc") || "Data transmission protocol"}</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("transportType")}</Label>
+            <Select value={(vlessConfig.transport_type) || "none"} onValueChange={(val) => { setVlessConfig({ ...vlessConfig, transport_type: (val === "none" ? "" : val)  }) }}>
+                <SelectTrigger className="h-9 w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-primary/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t("tcpDefault")}</SelectItem>
+                  <SelectItem value="ws">WebSocket</SelectItem>
+                  <SelectItem value="grpc">gRPC</SelectItem>
+                  <SelectItem value="http">HTTP/2</SelectItem>
+                  <SelectItem value="httpupgrade">HTTPUpgrade</SelectItem>
+                </SelectContent>
+              </Select>
+          </div>
+
+          {(vlessConfig.transport_type === "ws" || vlessConfig.transport_type === "http" || vlessConfig.transport_type === "httpupgrade") && (
+            <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50 animate-in fade-in slide-in-from-top-1 duration-200">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("path")}</Label>
+                <Input
+                  placeholder="/"
+                  value={vlessConfig.transport_path}
+                  onChange={(e) => setVlessConfig({ ...vlessConfig, transport_path: e.target.value })}
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("host")}</Label>
+                <Input
+                  placeholder="example.com"
+                  value={vlessConfig.transport_host}
+                  onChange={(e) => setVlessConfig({ ...vlessConfig, transport_host: e.target.value })}
+                  className="h-9 text-sm"
+                />
+              </div>
+              {vlessConfig.transport_type === "ws" && (
+                <>
+                  <div className="space-y-1.5 mt-2">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("maxEarlyData")}</Label>
+                    <Input
+                      type="number"
+                      value={vlessConfig.ws_max_early_data}
+                      onChange={(e) => setVlessConfig({ ...vlessConfig, ws_max_early_data: parseInt(e.target.value) || 0 })}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5 mt-2">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("earlyDataHeader")}</Label>
+                    <Input
+                      value={vlessConfig.ws_early_data_header}
+                      onChange={(e) => setVlessConfig({ ...vlessConfig, ws_early_data_header: e.target.value })}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {vlessConfig.transport_type === "grpc" && (
+            <div className="p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50 animate-in fade-in slide-in-from-top-1 duration-200">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("serviceName")}</Label>
+                <Input
+                  placeholder="grpc_service"
+                  value={vlessConfig.transport_service_name}
+                  onChange={(e) => setVlessConfig({ ...vlessConfig, transport_service_name: e.target.value })}
+                  className="h-9 text-sm"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Multiplex Settings */}
+      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative group transition-all duration-300">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500">
+              <Zap className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold">{t("multiplexSettings")}</h3>
+              <p className="text-xs text-muted-foreground">{t("multiplexDesc") || "Connection optimization"}</p>
+            </div>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer group/label">
             <input
               type="checkbox"
               checked={vlessConfig.multiplex_enabled}
               onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_enabled: e.target.checked })}
-              className="h-4 w-4 rounded border-gray-300"
+              className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500"
             />
-            {t("enableMultiplex")}
+            <span className="text-sm font-medium group-hover/label:text-blue-500 transition-colors">{t("enableMultiplex")}</span>
           </label>
         </div>
+
         {vlessConfig.multiplex_enabled && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>{t("multiplexProtocol")}</Label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={vlessConfig.multiplex_protocol}
-                  onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_protocol: e.target.value })}
-                >
-                  <option value="">smux</option>
-                  <option value="yamux">yamux</option>
-                  <option value="h2mux">h2mux</option>
-                </select>
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("multiplexProtocol")}</Label>
+                <Select value={(vlessConfig.multiplex_protocol) || "none"} onValueChange={(val) => { setVlessConfig({ ...vlessConfig, multiplex_protocol: (val === "none" ? "" : val)  }) }}>
+                <SelectTrigger className="h-9 w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-primary/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">smux</SelectItem>
+                  <SelectItem value="yamux">yamux</SelectItem>
+                  <SelectItem value="h2mux">h2mux</SelectItem>
+                </SelectContent>
+              </Select>
               </div>
-              <div className="space-y-2">
-                <Label>{t("maxConnections")}</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("maxConnections")}</Label>
                 <Input
                   type="number"
                   value={vlessConfig.multiplex_max_connections}
                   onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_max_connections: parseInt(e.target.value) || 0 })}
+                  className="h-9 text-sm"
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>{t("minStreams")}</Label>
-                <Input
-                  type="number"
-                  value={vlessConfig.multiplex_min_streams}
-                  onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_min_streams: parseInt(e.target.value) || 0 })}
-                />
+
+            <div className="p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("minStreams")}</Label>
+                  <Input
+                    type="number"
+                    value={vlessConfig.multiplex_min_streams}
+                    onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_min_streams: parseInt(e.target.value) || 0 })}
+                    className="h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("maxStreams")}</Label>
+                  <Input
+                    type="number"
+                    value={vlessConfig.multiplex_max_streams}
+                    onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_max_streams: parseInt(e.target.value) || 0 })}
+                    className="h-9 text-sm"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>{t("maxStreams")}</Label>
-                <Input
-                  type="number"
-                  value={vlessConfig.multiplex_max_streams}
-                  onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_max_streams: parseInt(e.target.value) || 0 })}
-                />
+              <div className="flex items-center gap-6 pt-2">
+                <label className="flex items-center gap-2 cursor-pointer group/label">
+                  <input
+                    type="checkbox"
+                    checked={vlessConfig.multiplex_padding}
+                    onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_padding: e.target.checked })}
+                    className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium group-hover/label:text-blue-500 transition-colors">{t("enablePadding")}</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer group/label">
+                  <input
+                    type="checkbox"
+                    checked={vlessConfig.multiplex_brutal}
+                    onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_brutal: e.target.checked })}
+                    className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium group-hover/label:text-blue-500 transition-colors">{t("enableBrutal")}</span>
+                </label>
               </div>
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={vlessConfig.multiplex_padding}
-                onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_padding: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              {t("enablePadding")}
-            </label>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={vlessConfig.multiplex_brutal}
-                  onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_brutal: e.target.checked })}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                {t("enableBrutal")}
-              </label>
+
               {vlessConfig.multiplex_brutal && (
-                <div className="grid grid-cols-2 gap-4 ml-6">
-                  <div className="space-y-2">
-                    <Label>{t("upMbps")}</Label>
+                <div className="grid grid-cols-2 gap-4 pl-6 border-l-2 border-blue-500/20 animate-in fade-in slide-in-from-left-1 duration-200">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("upMbps")}</Label>
                     <Input
                       type="number"
                       value={vlessConfig.multiplex_brutal_up}
                       onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_brutal_up: parseInt(e.target.value) || 0 })}
+                      className="h-9 text-sm"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>{t("downMbps")}</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("downMbps")}</Label>
                     <Input
                       type="number"
                       value={vlessConfig.multiplex_brutal_down}
                       onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_brutal_down: parseInt(e.target.value) || 0 })}
+                      className="h-9 text-sm"
                     />
                   </div>
                 </div>

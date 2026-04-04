@@ -36,6 +36,11 @@ export function NaiveForm({
 
   const [initialized, setInitialized] = useState(false)
 
+  const normalizeCongestionControl = (value: string) => {
+    if (value === "new_reno") return "reno"
+    return value
+  }
+
   // Load from initialConfig
   useEffect(() => {
     if (initialized) return
@@ -56,7 +61,7 @@ export function NaiveForm({
       tls_certificate_path: initialConfig.tls?.certificate_path || "/etc/sing-box/cert.pem",
       tls_key_path: initialConfig.tls?.key_path || "/etc/sing-box/key.pem",
       network: (typeof initialConfig.network === "string" ? initialConfig.network : "") as "" | "tcp" | "udp",
-      quic_congestion_control: initialConfig.quic_congestion_control || "",
+      quic_congestion_control: normalizeCongestionControl(initialConfig.quic_congestion_control || ""),
     })
     setInitialized(true)
   }, [initialConfig, initialized])
@@ -226,7 +231,7 @@ export function NaiveForm({
         >
           <option value="">{t("defaultAuto")}</option>
           <option value="cubic">Cubic</option>
-          <option value="new_reno">New Reno</option>
+          <option value="reno">New Reno</option>
           <option value="bbr">BBR</option>
         </select>
       </div>

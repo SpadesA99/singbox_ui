@@ -139,7 +139,8 @@
     "instanceLogsDesc": "查看当前运行实例的日志输出",
     "noLogs": "暂无日志",
     "loadingLogs": "加载日志中...",
-    "getLogsFailed": "获取日志失败"
+    "getLogsFailed": "获取日志失败",
+    "configuration": "配置"
   },
   "subscription": {
     "defaultBrowser": "默认浏览器",
@@ -428,7 +429,10 @@
     "userName": "用户名",
     "zeroRttHandshake": "0-RTT 握手",
     "quicCongestionControl": "QUIC 拥塞控制",
-    "defaultAuto": "默认（自动）"
+    "defaultAuto": "默认（自动）",
+    "configuration": "配置",
+    "tlsConfiguration": "TLS 配置",
+    "managePeers": "管理 WireGuard 客户端节点。"
   },
   "outbound": {
     "title": "出站配置",

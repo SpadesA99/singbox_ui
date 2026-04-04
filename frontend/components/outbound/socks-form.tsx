@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { useTranslation } from "@/lib/i18n"
 import { OutboundFormProps } from "./types"
@@ -87,15 +88,16 @@ export function SocksForm({ initialConfig, setOutbound }: OutboundFormProps) {
         </div>
         <div className="space-y-2">
           <Label>{t("socksVersion")}</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={socksConfig.version}
-            onChange={(e) => setSocksConfig({ ...socksConfig, version: e.target.value })}
-          >
-            <option value="5">{t("socks5Default")}</option>
-            <option value="4a">SOCKS4a</option>
-            <option value="4">SOCKS4</option>
-          </select>
+          <Select value={(socksConfig.version) || "none"} onValueChange={(val) => { setSocksConfig({ ...socksConfig, version: (val === "none" ? "" : val)  }) }}>
+                <SelectTrigger className="h-9 w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-primary/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">{t("socks5Default")}</SelectItem>
+                  <SelectItem value="4a">SOCKS4a</SelectItem>
+                  <SelectItem value="4">SOCKS4</SelectItem>
+                </SelectContent>
+              </Select>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
@@ -121,15 +123,16 @@ export function SocksForm({ initialConfig, setOutbound }: OutboundFormProps) {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>{t("networkProtocol")}</Label>
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              value={socksConfig.network}
-              onChange={(e) => setSocksConfig({ ...socksConfig, network: e.target.value })}
-            >
-              <option value="">{t("allDefault")}</option>
-              <option value="tcp">{t("tcpOnly")}</option>
-              <option value="udp">{t("udpOnly")}</option>
-            </select>
+            <Select value={(socksConfig.network) || "none"} onValueChange={(val) => { setSocksConfig({ ...socksConfig, network: (val === "none" ? "" : val)  }) }}>
+                <SelectTrigger className="h-9 w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-primary/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t("allDefault")}</SelectItem>
+                  <SelectItem value="tcp">{t("tcpOnly")}</SelectItem>
+                  <SelectItem value="udp">{t("udpOnly")}</SelectItem>
+                </SelectContent>
+              </Select>
           </div>
           <div className="space-y-2 flex items-end">
             <label className="flex items-center gap-2 text-sm pb-2">

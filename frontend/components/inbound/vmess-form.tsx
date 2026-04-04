@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Trash2, Key, QrCode, Shield, Upload, Loader2, CheckCircle, XCircle } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Plus, Trash2, Key, QrCode, Shield, Upload, Loader2, CheckCircle, XCircle, Network, Layers, Copy } from "lucide-react"
 import { isValidPort, parsePort, isValidListenAddress } from "@/lib/utils"
 import { apiClient } from "@/lib/api"
 import { useTranslation } from "@/lib/i18n"
@@ -295,12 +296,14 @@ export function VmessForm({
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-4 pt-2 border-t border-border/50">
         <div className="flex items-center justify-between">
-          <Label>{t("users")}</Label>
+          <div>
+            <Label className="text-base font-medium">{t("users")}</Label>
+            <p className="text-xs text-muted-foreground">{t("usersDesc")}</p>
+          </div>
           <Button
             size="sm"
-            variant="outline"
             onClick={() =>
               setVmessConfig({
                 ...vmessConfig,
@@ -308,250 +311,257 @@ export function VmessForm({
               })
             }
           >
-            <Plus className="h-4 w-4 mr-1" />
+            <Plus className="h-4 w-4 mr-1.5" />
             {tc("add")}
           </Button>
         </div>
 
-        {vmessConfig.users.map((user, index) => (
-          <Card key={index} className="p-3">
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label className="text-sm">{t("userIndex", { n: index + 1 })}</Label>
-                <div className="flex gap-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => showVmessQrCode(index)}
-                    disabled={!user.uuid}
-                  >
-                    <QrCode className="h-4 w-4" />
-                  </Button>
-                  {vmessConfig.users.length > 1 && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() =>
-                        setVmessConfig({
-                          ...vmessConfig,
-                          users: vmessConfig.users.filter((_, i) => i !== index),
-                        })
-                      }
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="UUID"
-                  value={user.uuid}
-                  onChange={(e) => {
-                    const newUsers = [...vmessConfig.users]
-                    newUsers[index].uuid = e.target.value
-                    setVmessConfig({ ...vmessConfig, users: newUsers })
-                  }}
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const newUsers = [...vmessConfig.users]
-                    newUsers[index].uuid = crypto.randomUUID()
-                    setVmessConfig({ ...vmessConfig, users: newUsers })
-                  }}
-                >
-                  <Key className="h-4 w-4" />
-                </Button>
-              </div>
-              <Input
-                placeholder={t("nameOptional")}
-                value={user.name || ""}
-                onChange={(e) => {
-                  const newUsers = [...vmessConfig.users]
-                  newUsers[index].name = e.target.value
-                  setVmessConfig({ ...vmessConfig, users: newUsers })
-                }}
-              />
-              <div className="space-y-1">
-                <Label className="text-xs">{t("alterIdHint")}</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={user.alterId || 0}
-                  onChange={(e) => {
-                    const newUsers = [...vmessConfig.users]
-                    newUsers[index].alterId = parseInt(e.target.value) || 0
-                    setVmessConfig({ ...vmessConfig, users: newUsers })
-                  }}
-                />
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      {/* TLS */}
-      <div className="space-y-2 border-t pt-4">
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="vmess-tls-enabled"
-            checked={vmessConfig.tls_enabled}
-            onChange={(e) => setVmessConfig({ ...vmessConfig, tls_enabled: e.target.checked })}
-            className="h-4 w-4"
-          />
-          <Label htmlFor="vmess-tls-enabled">{t("enableTls")}</Label>
-        </div>
-        {vmessConfig.tls_enabled && (
-          <div className="space-y-2 pl-6">
-            <div className="flex gap-2 items-center">
-              <select
-                value={vmessConfig.tls_mode}
-                onChange={(e) =>
-                  setVmessConfig({ ...vmessConfig, tls_mode: e.target.value as "manual" | "acme" | "reality" })
-                }
-                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
-              >
-                <option value="manual">{t("manualConfig")}</option>
-                <option value="acme">{t("acmeAuto")}</option>
-                <option value="reality">Reality</option>
-              </select>
-              {vmessConfig.tls_mode === "manual" && (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onGenerateCert(vmessConfig.tls_server_name || undefined)}
-                    disabled={certLoading}
-                  >
-                    <Shield className="h-4 w-4 mr-1" />
-                    {certLoading ? t("generating") : t("generateSelfSignedCert")}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onUploadCert()}
-                    disabled={certLoading}
-                  >
-                    <Upload className="h-4 w-4 mr-1" />
-                    {t("uploadCert")}
-                  </Button>
-                </>
-              )}
-              {certInfo && vmessConfig.tls_mode === "manual" && (
-                <span className="text-xs text-muted-foreground self-center">
-                  {t("certGenerated", { name: certInfo.common_name ?? "", validTo: certInfo.valid_to ?? "" })}
-                </span>
-              )}
-            </div>
-
-            {vmessConfig.tls_mode === "reality" ? (
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>{t("realityHandshakeServer")}</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={vmessConfig.reality_handshake_server}
-                        onChange={(e) => {
-                          const server = e.target.value
-                          const updates: any = { reality_handshake_server: server }
-                          if (
-                            !vmessConfig.tls_server_name ||
-                            vmessConfig.tls_server_name === vmessConfig.reality_handshake_server
-                          ) {
-                            updates.tls_server_name = server
-                          }
-                          setVmessConfig({ ...vmessConfig, ...updates })
-                          setTlsCheckState({ loading: false })
-                        }}
-                        placeholder="www.example.com"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="shrink-0"
-                        disabled={!vmessConfig.reality_handshake_server || tlsCheckState.loading}
-                        onClick={async () => {
-                          setTlsCheckState({ loading: true })
-                          try {
-                            const res = await apiClient.checkTls13Support(
-                              vmessConfig.reality_handshake_server,
-                              vmessConfig.reality_handshake_port
-                            )
-                            setTlsCheckState({ loading: false, result: res })
-                          } catch {
-                            setTlsCheckState({
-                              loading: false,
-                              result: { supported: false, tls_version: "", error: t("tlsCheckFailed") },
-                            })
-                          }
-                        }}
-                      >
-                        {tlsCheckState.loading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          t("tlsCheck")
-                        )}
-                      </Button>
+        <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
+          {vmessConfig.users.map((user, index) => (
+            <div key={index} className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative group hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center mb-1">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                      {index + 1}
                     </div>
-                    {tlsCheckState.result && (
-                      <p
-                        className={`text-xs flex items-center gap-1 ${
-                          tlsCheckState.result.supported ? "text-green-600" : "text-red-500"
-                        }`}
+                    <Label className="text-sm font-semibold tracking-tight text-zinc-700 dark:text-zinc-300">{user.name || `User ${index + 1}`}</Label>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-zinc-400 hover:text-primary hover:bg-primary/5 rounded-full"
+                      onClick={() => showVmessQrCode(index)}
+                      disabled={!user.uuid}
+                    >
+                      <QrCode className="h-4 w-4" />
+                    </Button>
+                    {vmessConfig.users.length > 1 && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-zinc-400 hover:text-destructive hover:bg-destructive/5 rounded-full"
+                        onClick={() =>
+                          setVmessConfig({
+                            ...vmessConfig,
+                            users: vmessConfig.users.filter((_, i) => i !== index),
+                          })
+                        }
                       >
-                        {tlsCheckState.result.supported ? (
-                          <>
-                            <CheckCircle className="h-3 w-3" /> {t("tlsCheckPass")} ({tlsCheckState.result.tls_version})
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="h-3 w-3" />{" "}
-                            {tlsCheckState.result.error ||
-                              `${t("tlsCheckFail")} (${tlsCheckState.result.tls_version || "N/A"})`}
-                          </>
-                        )}
-                      </p>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     )}
                   </div>
-                  <div className="space-y-2">
-                    <Label>{t("realityHandshakePort")}</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="65535"
-                      value={vmessConfig.reality_handshake_port}
-                      onChange={(e) => {
-                        const port = parsePort(e.target.value, vmessConfig.reality_handshake_port)
-                        setVmessConfig({ ...vmessConfig, reality_handshake_port: port })
-                      }}
-                    />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold ml-1">{t("configuration")}</Label>
+                  <div className="space-y-3 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-zinc-500">UUID</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="e.g. 12345678-1234..."
+                          value={user.uuid}
+                          onChange={(e) => {
+                            const newUsers = [...vmessConfig.users]
+                            newUsers[index].uuid = e.target.value
+                            setVmessConfig({ ...vmessConfig, users: newUsers })
+                          }}
+                          className="flex-1 h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm font-mono focus-visible:ring-primary/20"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 shrink-0 border-zinc-200 dark:border-zinc-800"
+                          onClick={() => {
+                            const newUsers = [...vmessConfig.users]
+                            newUsers[index].uuid = crypto.randomUUID()
+                            setVmessConfig({ ...vmessConfig, users: newUsers })
+                          }}
+                        >
+                          <Key className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-zinc-500">{t("nameOptional")}</Label>
+                        <Input
+                          placeholder="Remarks"
+                          value={user.name || ""}
+                          onChange={(e) => {
+                            const newUsers = [...vmessConfig.users]
+                            newUsers[index].name = e.target.value
+                            setVmessConfig({ ...vmessConfig, users: newUsers })
+                          }}
+                          className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus-visible:ring-primary/20"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-zinc-500">{t("alterIdHint")}</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={user.alterId || 0}
+                          onChange={(e) => {
+                            const newUsers = [...vmessConfig.users]
+                            newUsers[index].alterId = parseInt(e.target.value) || 0
+                            setVmessConfig({ ...vmessConfig, users: newUsers })
+                          }}
+                          className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus-visible:ring-primary/20"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>SNI ({t("serverNameOptional")})</Label>
-                  <Input
-                    value={vmessConfig.tls_server_name}
-                    onChange={(e) => setVmessConfig({ ...vmessConfig, tls_server_name: e.target.value })}
-                    placeholder={vmessConfig.reality_handshake_server || "example.com"}
-                  />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 pt-6">
+        {/* TLS section */}
+        <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative group transition-all duration-300">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-blue-500 text-white shadow-sm">
+              <Shield className="h-4 w-4" />
+            </div>
+            <div>
+              <Label className="text-base font-bold tracking-tight">{t("tlsConfiguration")}</Label>
+              <p className="text-xs text-zinc-400 font-medium">Security and encryption settings</p>
+            </div>
+            <div className="ml-auto">
+              <input
+                type="checkbox"
+                id="vmess-tls-enabled"
+                checked={vmessConfig.tls_enabled}
+                onChange={(e) => setVmessConfig({ ...vmessConfig, tls_enabled: e.target.checked })}
+                className="h-4 w-4 rounded border-zinc-300 text-primary focus:ring-primary"
+              />
+            </div>
+          </div>
+
+          {vmessConfig.tls_enabled && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
+              <div className="space-y-1.5 ml-1">
+                <Label className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Security Mode</Label>
+                <div className="flex flex-wrap gap-2 items-center">
+                  <Select
+                    value={vmessConfig.tls_mode}
+                    onValueChange={(val) => setVmessConfig({ ...vmessConfig, tls_mode: val as "manual" | "acme" | "reality" })}
+                  >
+                    <SelectTrigger className="w-[140px] h-9 bg-zinc-50/80 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800">
+                      <SelectValue placeholder="Mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manual">{t("manualConfig")}</SelectItem>
+                      <SelectItem value="acme">{t("acmeAuto")}</SelectItem>
+                      <SelectItem value="reality">Reality</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {vmessConfig.tls_mode === "manual" && (
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => onGenerateCert(vmessConfig.tls_server_name || undefined)} disabled={certLoading} className="h-9 rounded-lg border-zinc-200 dark:border-zinc-800">
+                        <Shield className="h-4 w-4 mr-1.5 text-blue-500" />
+                        {certLoading ? t("generating") : t("generateSelfSignedCert")}
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => onUploadCert()} disabled={certLoading} className="h-9 rounded-lg border-zinc-200 dark:border-zinc-800">
+                        <Upload className="h-4 w-4 mr-1.5 text-zinc-500" />
+                        {t("uploadCert")}
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>{t("realityPrivateKey")}</Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
+                {certInfo && vmessConfig.tls_mode === "manual" && (
+                  <p className="text-[10px] text-emerald-600 font-medium mt-1 ml-1 bg-emerald-50 dark:bg-emerald-500/10 p-2 rounded-lg border border-emerald-100 dark:border-emerald-500/20">
+                    {t("certGenerated", { name: certInfo.common_name ?? "", validTo: certInfo.valid_to ?? "" })}
+                  </p>
+                )}
+              </div>
+
+              {vmessConfig.tls_mode === "reality" ? (
+                <div className="space-y-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-zinc-500">{t("realityHandshakeServer")}</Label>
+                      <div className="flex gap-1.5">
+                        <Input
+                          value={vmessConfig.reality_handshake_server}
+                          onChange={(e) => {
+                            const server = e.target.value
+                            const updates: any = { reality_handshake_server: server }
+                            if (!vmessConfig.tls_server_name || vmessConfig.tls_server_name === vmessConfig.reality_handshake_server) {
+                              updates.tls_server_name = server
+                            }
+                            setVmessConfig({ ...vmessConfig, ...updates })
+                            setTlsCheckState({ loading: false })
+                          }}
+                          placeholder="www.example.com"
+                          className="h-8 text-sm bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0 h-8 px-2 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+                          disabled={!vmessConfig.reality_handshake_server || tlsCheckState.loading}
+                          onClick={async () => {
+                            setTlsCheckState({ loading: true })
+                            try {
+                              const res = await apiClient.checkTls13Support(vmessConfig.reality_handshake_server, vmessConfig.reality_handshake_port)
+                              setTlsCheckState({ loading: false, result: res })
+                            } catch {
+                              setTlsCheckState({ loading: false, result: { supported: false, tls_version: "", error: t("tlsCheckFailed") } })
+                            }
+                          }}
+                        >
+                          {tlsCheckState.loading ? <Loader2 className="h-3 w-3 animate-spin" /> : t("tlsCheck")}
+                        </Button>
+                      </div>
+                      {tlsCheckState.result && (
+                        <p className={`text-[10px] flex items-center gap-1 mt-1 ${tlsCheckState.result.supported ? "text-emerald-600" : "text-rose-500"}`}>
+                          {tlsCheckState.result.supported ? <><CheckCircle className="h-3 w-3" /> {t("tlsCheckPass")} ({tlsCheckState.result.tls_version})</> : <><XCircle className="h-3 w-3" /> {tlsCheckState.result.error || `${t("tlsCheckFail")} (${tlsCheckState.result.tls_version || "N/A"})`}</>}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-zinc-500">{t("realityHandshakePort")}</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="65535"
+                        value={vmessConfig.reality_handshake_port}
+                        onChange={(e) => setVmessConfig({ ...vmessConfig, reality_handshake_port: parsePort(e.target.value, vmessConfig.reality_handshake_port) })}
+                        className="h-8 text-sm bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-zinc-500">SNI ({t("serverNameOptional")})</Label>
+                    <Input
+                      value={vmessConfig.tls_server_name}
+                      onChange={(e) => setVmessConfig({ ...vmessConfig, tls_server_name: e.target.value })}
+                      placeholder={vmessConfig.reality_handshake_server || "example.com"}
+                      className="h-8 text-sm bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+                    />
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-zinc-500">{t("realityPrivateKey")}</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-[10px] text-primary hover:bg-primary/5 rounded-md"
+                        onClick={async () => {
                         try {
                           const response = await apiClient.generateRealityKeypair()
                           if (response.private_key) {
@@ -570,7 +580,6 @@ export function VmessForm({
                               try {
                                 await navigator.clipboard.writeText(response.public_key)
                               } catch {
-                                // clipboard may fail in non-HTTPS contexts
                               }
                             }
                           }
@@ -579,249 +588,280 @@ export function VmessForm({
                         }
                       }}
                     >
-                      <Key className="h-4 w-4 mr-1" />
+                      <Key className="h-3 w-3 mr-1" />
                       {t("generateKeys")}
                     </Button>
                   </div>
-                  <Input
-                    value={vmessConfig.reality_private_key}
-                    onChange={(e) => setVmessConfig({ ...vmessConfig, reality_private_key: e.target.value })}
-                    placeholder="Private Key"
-                  />
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      value={vmessConfig.reality_private_key}
+                      onChange={(e) => setVmessConfig({ ...vmessConfig, reality_private_key: e.target.value })}
+                      placeholder="Private Key"
+                      className="h-8 text-sm flex-1 font-mono bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+                    />
+                  </div>
                   {vmessConfig.reality_public_key && (
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs text-muted-foreground shrink-0">{t("publicKey")}:</Label>
-                      <code className="text-xs bg-muted px-2 py-1 rounded flex-1 truncate">
-                        {vmessConfig.reality_public_key}
-                      </code>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(vmessConfig.reality_public_key)
-                            onError(t("keyCopied"))
-                            setTimeout(() => onError(""), 3000)
-                          } catch {
-                            // fallback
-                          }
-                        }}
-                      >
-                        {t("copyPublicKey")}
-                      </Button>
+                    <div className="flex flex-col gap-1.5 pt-2 border-t border-zinc-100 dark:border-zinc-800/50 mt-1">
+                      <Label className="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">{t("publicKey")}</Label>
+                      <div className="flex gap-2 items-center w-full">
+                        <code className="text-[10px] bg-zinc-100 dark:bg-zinc-800 px-2 py-1.5 rounded-lg flex-1 truncate select-all font-mono text-zinc-600 dark:text-zinc-400">
+                          {vmessConfig.reality_public_key}
+                        </code>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          className="h-7 w-7 shrink-0 bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(vmessConfig.reality_public_key)
+                              onError(t("keyCopied"))
+                              setTimeout(() => onError(""), 3000)
+                            } catch {
+                            }
+                          }}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label>{t("realityShortId")}</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-zinc-500">{t("realityShortId")}</Label>
                   <Input
                     value={vmessConfig.reality_short_id}
                     onChange={(e) => setVmessConfig({ ...vmessConfig, reality_short_id: e.target.value })}
                     placeholder="0123456789abcdef"
+                    className="h-8 text-sm font-mono bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
                   />
-                  <p className="text-xs text-muted-foreground">{t("realityShortIdHint")}</p>
+                  <p className="text-[10px] text-zinc-400 ml-1">{t("realityShortIdHint")}</p>
                 </div>
               </div>
             ) : vmessConfig.tls_mode === "acme" ? (
-              <div className="space-y-2">
-                <Label>{t("acmeDomain")}</Label>
+              <div className="space-y-1.5 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
+                <Label className="text-xs text-zinc-500">{t("acmeDomain")}</Label>
                 <Input
                   value={vmessConfig.tls_acme_domain}
                   onChange={(e) => setVmessConfig({ ...vmessConfig, tls_acme_domain: e.target.value })}
                   placeholder="example.com"
+                  className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                 />
-                <p className="text-xs text-muted-foreground">{t("acmeHint")}</p>
+                <p className="text-[10px] text-zinc-400 ml-1">{t("acmeHint")}</p>
               </div>
             ) : (
-              <>
-                <div className="space-y-2">
-                  <Label>{t("serverNameOptional")}</Label>
+              <div className="space-y-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-zinc-500">{t("serverNameOptional")}</Label>
                   <Input
                     value={vmessConfig.tls_server_name}
                     onChange={(e) => setVmessConfig({ ...vmessConfig, tls_server_name: e.target.value })}
                     placeholder="example.com"
+                    className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>{t("certPath")}</Label>
-                  <Input
-                    value={vmessConfig.tls_certificate_path}
-                    onChange={(e) => setVmessConfig({ ...vmessConfig, tls_certificate_path: e.target.value })}
-                    placeholder="/etc/sing-box/cert.pem"
-                  />
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-zinc-500">{t("certPath")}</Label>
+                    <Input
+                      value={vmessConfig.tls_certificate_path}
+                      onChange={(e) => setVmessConfig({ ...vmessConfig, tls_certificate_path: e.target.value })}
+                      placeholder="/etc/sing-box/cert.pem"
+                      className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-zinc-500">{t("keyPath")}</Label>
+                    <Input
+                      value={vmessConfig.tls_key_path}
+                      onChange={(e) => setVmessConfig({ ...vmessConfig, tls_key_path: e.target.value })}
+                      placeholder="/etc/sing-box/key.pem"
+                      className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>{t("keyPath")}</Label>
-                  <Input
-                    value={vmessConfig.tls_key_path}
-                    onChange={(e) => setVmessConfig({ ...vmessConfig, tls_key_path: e.target.value })}
-                    placeholder="/etc/sing-box/key.pem"
-                  />
-                </div>
-              </>
+              </div>
             )}
-
-            {/* ALPN */}
-            <div className="space-y-2">
-              <Label>{t("alpnProtocol")}</Label>
+            <div className="space-y-1.5 pt-2 ml-1">
+              <Label className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">{t("alpnProtocol")}</Label>
               <Input
                 value={vmessConfig.tls_alpn}
                 onChange={(e) => setVmessConfig({ ...vmessConfig, tls_alpn: e.target.value })}
                 placeholder="h2, http/1.1"
+                className="h-9 bg-zinc-50/80 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 text-sm"
               />
-              <p className="text-xs text-muted-foreground">{t("alpnHint")}</p>
+              <p className="text-[10px] text-zinc-400 ml-1">{t("alpnHint")}</p>
             </div>
           </div>
         )}
-      </div>
+        </div>
 
-      {/* Transport */}
-      <div className="space-y-2 border-t pt-4">
-        <Label>{t("transportProtocol")}</Label>
-        <select
-          className="w-full h-9 px-3 rounded-md border border-input bg-transparent"
-          value={vmessConfig.transport_type}
-          onChange={(e) => setVmessConfig({ ...vmessConfig, transport_type: e.target.value })}
-        >
-          <option value="tcp">{t("tcpDefault")}</option>
-          <option value="ws">WebSocket</option>
-          <option value="grpc">gRPC</option>
-          <option value="http">HTTP/2</option>
-          <option value="httpupgrade">HTTP Upgrade</option>
-        </select>
-        {vmessConfig.transport_type !== "tcp" && (
-          <div className="space-y-2 pt-2">
-            {vmessConfig.transport_type === "grpc" ? (
-              <div className="space-y-2">
-                <Label>Service Name</Label>
-                <Input
-                  value={vmessConfig.transport_service_name}
-                  onChange={(e) => setVmessConfig({ ...vmessConfig, transport_service_name: e.target.value })}
-                  placeholder="grpc-service"
+        {/* Transport & Multiplex section */}
+        <div className="space-y-6">
+          <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative group transition-all duration-300">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-500 text-white shadow-sm">
+                <Network className="h-4 w-4" />
+              </div>
+              <div>
+                <Label className="text-base font-bold tracking-tight">Transport</Label>
+                <p className="text-xs text-zinc-400 font-medium">Protocol and path settings</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5 ml-1">
+                <Label className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">{t("transportProtocol")}</Label>
+                <Select
+                  value={vmessConfig.transport_type}
+                  onValueChange={(val) => setVmessConfig({ ...vmessConfig, transport_type: val })}
+                >
+                  <SelectTrigger className="h-9 bg-zinc-50/80 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="tcp">{t("tcpDefault")}</SelectItem>
+                    <SelectItem value="ws">WebSocket</SelectItem>
+                    <SelectItem value="grpc">gRPC</SelectItem>
+                    <SelectItem value="http">HTTP/2</SelectItem>
+                    <SelectItem value="httpupgrade">HTTP Upgrade</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {vmessConfig.transport_type !== "tcp" && (
+                <div className="space-y-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50 animate-in fade-in slide-in-from-top-1">
+                  {vmessConfig.transport_type === "grpc" ? (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-zinc-500">Service Name</Label>
+                      <Input
+                        value={vmessConfig.transport_service_name}
+                        onChange={(e) => setVmessConfig({ ...vmessConfig, transport_service_name: e.target.value })}
+                        placeholder="grpc-service"
+                        className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-zinc-500">Path</Label>
+                      <Input
+                        value={vmessConfig.transport_path}
+                        onChange={(e) => setVmessConfig({ ...vmessConfig, transport_path: e.target.value })}
+                        placeholder="/ws-path"
+                        className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
+                      />
+                    </div>
+                  )}
+                  {(vmessConfig.transport_type === "http" || vmessConfig.transport_type === "httpupgrade") && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-zinc-500">{t("host")}</Label>
+                      <Input
+                        value={vmessConfig.transport_host}
+                        onChange={(e) => setVmessConfig({ ...vmessConfig, transport_host: e.target.value })}
+                        placeholder="example.com"
+                        className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
+                      />
+                    </div>
+                  )}
+                  {vmessConfig.transport_type === "ws" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-zinc-500">{t("maxEarlyData")}</Label>
+                        <Input
+                          type="number"
+                          value={vmessConfig.ws_max_early_data}
+                          onChange={(e) => setVmessConfig({ ...vmessConfig, ws_max_early_data: parseInt(e.target.value) || 0 })}
+                          placeholder="2048"
+                          className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-zinc-500">{t("earlyDataHeader")}</Label>
+                        <Input
+                          value={vmessConfig.ws_early_data_header_name}
+                          onChange={(e) => setVmessConfig({ ...vmessConfig, ws_early_data_header_name: e.target.value })}
+                          placeholder="Sec-WebSocket-Protocol"
+                          className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative group transition-all duration-300">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-orange-500 text-white shadow-sm">
+                <Layers className="h-4 w-4" />
+              </div>
+              <div>
+                <Label className="text-base font-bold tracking-tight">Multiplex</Label>
+                <p className="text-xs text-zinc-400 font-medium">Performance and latency optimization</p>
+              </div>
+              <div className="ml-auto">
+                <input
+                  type="checkbox"
+                  id="vmess-multiplex"
+                  checked={vmessConfig.multiplex_enabled}
+                  onChange={(e) => setVmessConfig({ ...vmessConfig, multiplex_enabled: e.target.checked })}
+                  className="h-4 w-4 rounded border-zinc-300 text-primary focus:ring-primary"
                 />
               </div>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <Label>Path</Label>
-                  <Input
-                    value={vmessConfig.transport_path}
-                    onChange={(e) => setVmessConfig({ ...vmessConfig, transport_path: e.target.value })}
-                    placeholder="/ws-path"
-                  />
-                </div>
-                {/* Host for HTTP/2 and HTTPUpgrade */}
-                {(vmessConfig.transport_type === "http" || vmessConfig.transport_type === "httpupgrade") && (
-                  <div className="space-y-2">
-                    <Label>{t("host")}</Label>
-                    <Input
-                      value={vmessConfig.transport_host}
-                      onChange={(e) => setVmessConfig({ ...vmessConfig, transport_host: e.target.value })}
-                      placeholder={vmessConfig.transport_type === "http" ? "example.com, www.example.com" : "example.com"}
+            </div>
+
+            {vmessConfig.multiplex_enabled && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
+                <div className="flex flex-wrap gap-4 ml-1">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="vmess-multiplex-padding"
+                      checked={vmessConfig.multiplex_padding}
+                      onChange={(e) => setVmessConfig({ ...vmessConfig, multiplex_padding: e.target.checked })}
+                      className="h-4 w-4 rounded border-zinc-300 text-primary"
                     />
-                    {vmessConfig.transport_type === "http" && (
-                      <p className="text-xs text-muted-foreground">H2 host, {t("alpnHint")}</p>
-                    )}
+                    <Label htmlFor="vmess-multiplex-padding" className="text-sm font-medium text-zinc-600 dark:text-zinc-400">{t("multiplexPadding")}</Label>
                   </div>
-                )}
-                {/* WebSocket early data */}
-                {vmessConfig.transport_type === "ws" && (
-                  <>
-                    <div className="space-y-2">
-                      <Label>{t("maxEarlyData")}</Label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="vmess-multiplex-brutal"
+                      checked={vmessConfig.multiplex_brutal}
+                      onChange={(e) => setVmessConfig({ ...vmessConfig, multiplex_brutal: e.target.checked })}
+                      className="h-4 w-4 rounded border-zinc-300 text-primary"
+                    />
+                    <Label htmlFor="vmess-multiplex-brutal" className="text-sm font-medium text-zinc-600 dark:text-zinc-400">{t("enableBrutal")}</Label>
+                  </div>
+                </div>
+
+                {vmessConfig.multiplex_brutal && (
+                  <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-zinc-500">{t("upMbps")}</Label>
                       <Input
                         type="number"
-                        min="0"
-                        value={vmessConfig.ws_max_early_data}
-                        onChange={(e) =>
-                          setVmessConfig({ ...vmessConfig, ws_max_early_data: parseInt(e.target.value) || 0 })
-                        }
-                        placeholder="2048"
+                        value={vmessConfig.multiplex_brutal_up}
+                        onChange={(e) => setVmessConfig({ ...vmessConfig, multiplex_brutal_up: parseInt(e.target.value) || 0 })}
+                        className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>{t("earlyDataHeader")}</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-zinc-500">{t("downMbps")}</Label>
                       <Input
-                        value={vmessConfig.ws_early_data_header_name}
-                        onChange={(e) =>
-                          setVmessConfig({ ...vmessConfig, ws_early_data_header_name: e.target.value })
-                        }
-                        placeholder="Sec-WebSocket-Protocol"
+                        type="number"
+                        value={vmessConfig.multiplex_brutal_down}
+                        onChange={(e) => setVmessConfig({ ...vmessConfig, multiplex_brutal_down: parseInt(e.target.value) || 0 })}
+                        className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                       />
                     </div>
-                  </>
+                  </div>
                 )}
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Multiplex */}
-      <div className="space-y-2">
-        <div className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            id="vmess-multiplex"
-            checked={vmessConfig.multiplex_enabled}
-            onChange={(e) => setVmessConfig({ ...vmessConfig, multiplex_enabled: e.target.checked })}
-            className="h-4 w-4 rounded border-gray-300"
-          />
-          <Label htmlFor="vmess-multiplex">{t("multiplexEnabled")}</Label>
-        </div>
-        {vmessConfig.multiplex_enabled && (
-          <div className="space-y-2 ml-6">
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="vmess-multiplex-padding"
-                checked={vmessConfig.multiplex_padding}
-                onChange={(e) => setVmessConfig({ ...vmessConfig, multiplex_padding: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              <Label htmlFor="vmess-multiplex-padding">{t("multiplexPadding")}</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="vmess-multiplex-brutal"
-                checked={vmessConfig.multiplex_brutal}
-                onChange={(e) => setVmessConfig({ ...vmessConfig, multiplex_brutal: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              <Label htmlFor="vmess-multiplex-brutal">{t("enableBrutal")}</Label>
-            </div>
-            {vmessConfig.multiplex_brutal && (
-              <div className="grid grid-cols-2 gap-4 ml-6">
-                <div className="space-y-2">
-                  <Label>{t("upMbps")}</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={vmessConfig.multiplex_brutal_up || ""}
-                    onChange={(e) =>
-                      setVmessConfig({ ...vmessConfig, multiplex_brutal_up: parseInt(e.target.value) || 0 })
-                    }
-                    placeholder="100"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>{t("downMbps")}</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={vmessConfig.multiplex_brutal_down || ""}
-                    onChange={(e) =>
-                      setVmessConfig({ ...vmessConfig, multiplex_brutal_down: parseInt(e.target.value) || 0 })
-                    }
-                    placeholder="100"
-                  />
-                </div>
               </div>
             )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   )

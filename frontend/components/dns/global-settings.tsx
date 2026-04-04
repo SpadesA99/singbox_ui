@@ -21,7 +21,7 @@ export function GlobalSettings({
   const { t } = useTranslation("dns")
 
   return (
-    <div className="border-t pt-3 space-y-2">
+    <div className="space-y-2">
       <div className="flex items-center gap-3">
         <div className="flex-1 space-y-1">
           <Label className="text-xs">{t("defaultDnsServer")}</Label>

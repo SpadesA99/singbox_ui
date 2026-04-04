@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { useTranslation } from "@/lib/i18n"
 import { OutboundFormProps } from "./types"
@@ -160,20 +161,21 @@ export function AnytlsForm({ initialConfig, setOutbound }: OutboundFormProps) {
         {anytlsConfig.utls_enabled && (
           <div className="space-y-2">
             <Label>{t("browserFingerprint")}</Label>
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              value={anytlsConfig.utls_fingerprint}
-              onChange={(e) => setAnytlsConfig({ ...anytlsConfig, utls_fingerprint: e.target.value })}
-            >
-              <option value="chrome">Chrome</option>
-              <option value="firefox">Firefox</option>
-              <option value="safari">Safari</option>
-              <option value="edge">Edge</option>
-              <option value="ios">iOS</option>
-              <option value="android">Android</option>
-              <option value="random">{t("random")}</option>
-              <option value="randomized">{t("randomized")}</option>
-            </select>
+            <Select value={(anytlsConfig.utls_fingerprint) || "none"} onValueChange={(val) => { setAnytlsConfig({ ...anytlsConfig, utls_fingerprint: (val === "none" ? "" : val)  }) }}>
+                <SelectTrigger className="h-9 w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-primary/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="chrome">Chrome</SelectItem>
+                  <SelectItem value="firefox">Firefox</SelectItem>
+                  <SelectItem value="safari">Safari</SelectItem>
+                  <SelectItem value="edge">Edge</SelectItem>
+                  <SelectItem value="ios">iOS</SelectItem>
+                  <SelectItem value="android">Android</SelectItem>
+                  <SelectItem value="random">{t("random")}</SelectItem>
+                  <SelectItem value="randomized">{t("randomized")}</SelectItem>
+                </SelectContent>
+              </Select>
           </div>
         )}
       </div>

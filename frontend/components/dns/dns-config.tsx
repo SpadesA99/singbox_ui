@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Plus } from "lucide-react"
+import { Plus, Globe } from "lucide-react"
 import { useSingboxConfigStore, DnsServer, DnsRule, DnsConfig } from "@/lib/store/singbox-config"
 import { useTranslation } from "@/lib/i18n"
 import { ServerCard } from "./server-card"
@@ -138,7 +137,7 @@ export function DnsConfigComponent({ showCard = true }: DnsConfigProps) {
       <Templates onApply={handleApplyTemplate} />
 
       {/* DNS server list */}
-      <div className="space-y-3">
+      <div className="space-y-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
         <div className="flex items-center justify-between">
           <Label>{t("servers")}</Label>
           <Button type="button" size="sm" variant="outline" onClick={addServer}>
@@ -167,7 +166,7 @@ export function DnsConfigComponent({ showCard = true }: DnsConfigProps) {
       </div>
 
       {/* DNS rules */}
-      <div className="space-y-3">
+      <div className="space-y-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
         <div className="flex items-center justify-between">
           <Label>{t("rules")}</Label>
           <Button
@@ -203,13 +202,15 @@ export function DnsConfigComponent({ showCard = true }: DnsConfigProps) {
         ))}
       </div>
 
-      <GlobalSettings
-        finalServer={finalServer}
-        setFinalServer={setFinalServer}
-        independentCache={independentCache}
-        setIndependentCache={setIndependentCache}
-        availableServerTags={availableServerTags}
-      />
+      <div className="space-y-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
+        <GlobalSettings
+          finalServer={finalServer}
+          setFinalServer={setFinalServer}
+          independentCache={independentCache}
+          setIndependentCache={setIndependentCache}
+          availableServerTags={availableServerTags}
+        />
+      </div>
     </div>
   )
 
@@ -218,12 +219,17 @@ export function DnsConfigComponent({ showCard = true }: DnsConfigProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("title")}</CardTitle>
-        <CardDescription>{t("description")}</CardDescription>
-      </CardHeader>
-      <CardContent>{content}</CardContent>
-    </Card>
+    <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative transition-all duration-300">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-500 text-white shadow-sm">
+          <Globe className="w-5 h-5" />
+        </div>
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">{t("title")}</h2>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{t("description")}</p>
+        </div>
+      </div>
+      {content}
+    </div>
   )
 }

@@ -31,7 +31,7 @@ export function RuleCard({
   const { t } = useTranslation("dns")
 
   return (
-    <div className="border rounded-lg p-3 space-y-2">
+    <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 space-y-3 bg-white dark:bg-zinc-900/50 shadow-sm hover:shadow-md hover:border-primary/40 transition-all duration-200">
       <div className="flex items-center gap-2">
         <select
           className="h-8 rounded-md border border-input bg-background px-2 text-sm min-w-[90px]"

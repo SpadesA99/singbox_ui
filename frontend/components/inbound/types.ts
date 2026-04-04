@@ -50,7 +50,7 @@ export interface LocalPeer {
   privateKey?: string
   presharedKey?: string
   allowedIPs: string[]
-  persistentKeepaliveInterval?: string
+  persistentKeepaliveInterval?: number
 }
 
 // QR code types

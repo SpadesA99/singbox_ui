@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { useTranslation } from "@/lib/i18n"
 import { OutboundFormProps } from "./types"
+import { Shield, Zap, Globe, Server, Settings, ShieldCheck, Cpu, Network, Plug } from "lucide-react"
 
 export function ShadowsocksForm({ initialConfig, setOutbound }: OutboundFormProps) {
   const { t } = useTranslation("outbound")
@@ -99,200 +101,258 @@ export function ShadowsocksForm({ initialConfig, setOutbound }: OutboundFormProp
   }, [ssConfig, setOutbound])
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>{t("serverAddr")}</Label>
-          <Input
-            placeholder="example.com"
-            value={ssConfig.server}
-            onChange={(e) => setSsConfig({ ...ssConfig, server: e.target.value })}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>{tc("port")}</Label>
-          <Input
-            type="number"
-            value={ssConfig.server_port}
-            onChange={(e) => setSsConfig({ ...ssConfig, server_port: parseInt(e.target.value) || 8388 })}
-          />
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Label>{t("security")}</Label>
-        <select
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          value={ssConfig.method}
-          onChange={(e) => setSsConfig({ ...ssConfig, method: e.target.value })}
-        >
-          <option value="aes-128-gcm">aes-128-gcm</option>
-          <option value="aes-256-gcm">aes-256-gcm</option>
-          <option value="chacha20-poly1305">chacha20-poly1305</option>
-          <option value="chacha20-ietf-poly1305">chacha20-ietf-poly1305</option>
-          <option value="xchacha20-ietf-poly1305">xchacha20-ietf-poly1305</option>
-          <option value="2022-blake3-aes-128-gcm">2022-blake3-aes-128-gcm</option>
-          <option value="2022-blake3-aes-256-gcm">2022-blake3-aes-256-gcm</option>
-          <option value="2022-blake3-chacha20-poly1305">2022-blake3-chacha20-poly1305</option>
-          <option value="none">none</option>
-        </select>
-      </div>
-      <div className="space-y-2">
-        <Label>{tc("password")}</Label>
-        <Input
-          type="text"
-          value={ssConfig.password}
-          onChange={(e) => setSsConfig({ ...ssConfig, password: e.target.value })}
-        />
-      </div>
-
-      {/* Plugin */}
-      <div className="border-t pt-4 mt-4">
-        <div className="space-y-2 mb-4">
-          <Label className="font-semibold">{t("sip003Plugin")}</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={ssConfig.plugin}
-            onChange={(e) => setSsConfig({ ...ssConfig, plugin: e.target.value })}
-          >
-            <option value="">{tc("none")}</option>
-            <option value="obfs-local">obfs-local</option>
-            <option value="v2ray-plugin">v2ray-plugin</option>
-          </select>
-        </div>
-        {ssConfig.plugin && (
-          <div className="space-y-2">
-            <Label>{t("pluginOpts")}</Label>
-            <Input
-              placeholder="obfs=http;obfs-host=example.com"
-              value={ssConfig.plugin_opts}
-              onChange={(e) => setSsConfig({ ...ssConfig, plugin_opts: e.target.value })}
-            />
-            <p className="text-xs text-muted-foreground">
-              {ssConfig.plugin === "obfs-local" && t("obfsExample")}
-              {ssConfig.plugin === "v2ray-plugin" && t("v2rayPluginExample")}
-            </p>
+    <div className="space-y-6">
+      {/* Server Settings */}
+      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative group transition-all duration-300">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500">
+            <Server className="h-5 w-5" />
           </div>
-        )}
-      </div>
+          <div>
+            <h3 className="text-base font-semibold">{t("serverAddr")}</h3>
+            <p className="text-xs text-muted-foreground">{t("serverSettingsDesc") || "Basic connection details"}</p>
+          </div>
+        </div>
 
-      {/* Network */}
-      <div className="border-t pt-4 mt-4">
-        <div className="space-y-2">
-          <Label>{t("networkProtocol")}</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={ssConfig.network}
-            onChange={(e) => setSsConfig({ ...ssConfig, network: e.target.value })}
-          >
-            <option value="">{t("allDefault")}</option>
-            <option value="tcp">{t("tcpOnly")}</option>
-            <option value="udp">{t("udpOnly")}</option>
-          </select>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("serverAddr")}</Label>
+              <Input
+                placeholder="example.com"
+                value={ssConfig.server}
+                onChange={(e) => setSsConfig({ ...ssConfig, server: e.target.value })}
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{tc("port")}</Label>
+              <Input
+                type="number"
+                value={ssConfig.server_port}
+                onChange={(e) => setSsConfig({ ...ssConfig, server_port: parseInt(e.target.value) || 8388 })}
+                className="h-9 text-sm"
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("security")}</Label>
+              <Select value={(ssConfig.method) || "none"} onValueChange={(val) => { setSsConfig({ ...ssConfig, method: val }) }}>
+                <SelectTrigger className="h-9 w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-primary/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="aes-128-gcm">aes-128-gcm</SelectItem>
+                  <SelectItem value="aes-256-gcm">aes-256-gcm</SelectItem>
+                  <SelectItem value="chacha20-poly1305">chacha20-poly1305</SelectItem>
+                  <SelectItem value="chacha20-ietf-poly1305">chacha20-ietf-poly1305</SelectItem>
+                  <SelectItem value="xchacha20-ietf-poly1305">xchacha20-ietf-poly1305</SelectItem>
+                  <SelectItem value="2022-blake3-aes-128-gcm">2022-blake3-aes-128-gcm</SelectItem>
+                  <SelectItem value="2022-blake3-aes-256-gcm">2022-blake3-aes-256-gcm</SelectItem>
+                  <SelectItem value="2022-blake3-chacha20-poly1305">2022-blake3-chacha20-poly1305</SelectItem>
+                  <SelectItem value="none">none</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{tc("password")}</Label>
+              <Input
+                type="text"
+                value={ssConfig.password}
+                onChange={(e) => setSsConfig({ ...ssConfig, password: e.target.value })}
+                className="h-9 text-sm"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mt-2">
-        <input
-          type="checkbox"
-          id="ss-udp-over-tcp"
-          checked={ssConfig.udp_over_tcp}
-          onChange={(e) => setSsConfig({ ...ssConfig, udp_over_tcp: e.target.checked })}
-          className="h-4 w-4 rounded border-gray-300"
-        />
-        <Label htmlFor="ss-udp-over-tcp">{t("enableUdpOverTcp")}</Label>
+      {/* Network & Plugin */}
+      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative group transition-all duration-300">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-xl bg-green-500/10 text-green-500">
+            <Network className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-base font-semibold">{t("networkProtocol")} & {t("sip003Plugin")}</h3>
+            <p className="text-xs text-muted-foreground">{"Protocol and plugin configuration"}</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("networkProtocol")}</Label>
+              <Select value={(ssConfig.network) || "none"} onValueChange={(val) => { setSsConfig({ ...ssConfig, network: (val === "none" ? "" : val)  }) }}>
+                <SelectTrigger className="h-9 w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-primary/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t("allDefault")}</SelectItem>
+                  <SelectItem value="tcp">{t("tcpOnly")}</SelectItem>
+                  <SelectItem value="udp">{t("udpOnly")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer group/label">
+                <input
+                  type="checkbox"
+                  id="ss-udp-over-tcp"
+                  checked={ssConfig.udp_over_tcp}
+                  onChange={(e) => setSsConfig({ ...ssConfig, udp_over_tcp: e.target.checked })}
+                  className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm font-medium group-hover/label:text-blue-500 transition-colors">{t("enableUdpOverTcp")}</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("sip003Plugin")}</Label>
+              <Select value={(ssConfig.plugin) || "none"} onValueChange={(val) => { setSsConfig({ ...ssConfig, plugin: (val === "none" ? "" : val)  }) }}>
+                <SelectTrigger className="h-9 w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-primary/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{tc("none")}</SelectItem>
+                  <SelectItem value="obfs-local">obfs-local</SelectItem>
+                  <SelectItem value="v2ray-plugin">v2ray-plugin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {ssConfig.plugin && (
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("pluginOpts")}</Label>
+                <Input
+                  placeholder="obfs=http;obfs-host=example.com"
+                  value={ssConfig.plugin_opts}
+                  onChange={(e) => setSsConfig({ ...ssConfig, plugin_opts: e.target.value })}
+                  className="h-9 text-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {ssConfig.plugin === "obfs-local" && t("obfsExample")}
+                  {ssConfig.plugin === "v2ray-plugin" && t("v2rayPluginExample")}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Multiplex */}
-      <div className="border-t pt-4">
-        <div className="flex items-center gap-4 mb-4">
-          <Label className="font-semibold">{t("multiplexSettings")}</Label>
-          <label className="flex items-center gap-2 text-sm">
+      {/* Multiplex Settings */}
+      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative group transition-all duration-300">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500">
+              <Zap className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold">{t("multiplexSettings")}</h3>
+              <p className="text-xs text-muted-foreground">{t("multiplexDesc") || "Connection optimization"}</p>
+            </div>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer group/label">
             <input
               type="checkbox"
               checked={ssConfig.multiplex_enabled}
               onChange={(e) => setSsConfig({ ...ssConfig, multiplex_enabled: e.target.checked })}
-              className="h-4 w-4 rounded border-gray-300"
+              className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500"
             />
-            {t("enableMultiplex")}
+            <span className="text-sm font-medium group-hover/label:text-blue-500 transition-colors">{t("enableMultiplex")}</span>
           </label>
         </div>
+
         {ssConfig.multiplex_enabled && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>{t("multiplexProtocol")}</Label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={ssConfig.multiplex_protocol}
-                  onChange={(e) => setSsConfig({ ...ssConfig, multiplex_protocol: e.target.value })}
-                >
-                  <option value="">smux</option>
-                  <option value="yamux">yamux</option>
-                  <option value="h2mux">h2mux</option>
-                </select>
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("multiplexProtocol")}</Label>
+                <Select value={(ssConfig.multiplex_protocol) || "none"} onValueChange={(val) => { setSsConfig({ ...ssConfig, multiplex_protocol: (val === "none" ? "" : val)  }) }}>
+                <SelectTrigger className="h-9 w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-primary/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">smux</SelectItem>
+                  <SelectItem value="yamux">yamux</SelectItem>
+                  <SelectItem value="h2mux">h2mux</SelectItem>
+                </SelectContent>
+              </Select>
               </div>
-              <div className="space-y-2">
-                <Label>{t("maxConnections")}</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("maxConnections")}</Label>
                 <Input
                   type="number"
                   value={ssConfig.multiplex_max_connections}
                   onChange={(e) => setSsConfig({ ...ssConfig, multiplex_max_connections: parseInt(e.target.value) || 0 })}
+                  className="h-9 text-sm"
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>{t("minStreams")}</Label>
-                <Input
-                  type="number"
-                  value={ssConfig.multiplex_min_streams}
-                  onChange={(e) => setSsConfig({ ...ssConfig, multiplex_min_streams: parseInt(e.target.value) || 0 })}
-                />
+
+            <div className="p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("minStreams")}</Label>
+                  <Input
+                    type="number"
+                    value={ssConfig.multiplex_min_streams}
+                    onChange={(e) => setSsConfig({ ...ssConfig, multiplex_min_streams: parseInt(e.target.value) || 0 })}
+                    className="h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("maxStreams")}</Label>
+                  <Input
+                    type="number"
+                    value={ssConfig.multiplex_max_streams}
+                    onChange={(e) => setSsConfig({ ...ssConfig, multiplex_max_streams: parseInt(e.target.value) || 0 })}
+                    className="h-9 text-sm"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>{t("maxStreams")}</Label>
-                <Input
-                  type="number"
-                  value={ssConfig.multiplex_max_streams}
-                  onChange={(e) => setSsConfig({ ...ssConfig, multiplex_max_streams: parseInt(e.target.value) || 0 })}
-                />
+              <div className="flex items-center gap-6 pt-2">
+                <label className="flex items-center gap-2 cursor-pointer group/label">
+                  <input
+                    type="checkbox"
+                    checked={ssConfig.multiplex_padding}
+                    onChange={(e) => setSsConfig({ ...ssConfig, multiplex_padding: e.target.checked })}
+                    className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium group-hover/label:text-blue-500 transition-colors">{t("enablePadding")}</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer group/label">
+                  <input
+                    type="checkbox"
+                    checked={ssConfig.multiplex_brutal}
+                    onChange={(e) => setSsConfig({ ...ssConfig, multiplex_brutal: e.target.checked })}
+                    className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium group-hover/label:text-blue-500 transition-colors">{t("enableBrutal")}</span>
+                </label>
               </div>
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={ssConfig.multiplex_padding}
-                onChange={(e) => setSsConfig({ ...ssConfig, multiplex_padding: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              {t("enablePadding")}
-            </label>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={ssConfig.multiplex_brutal}
-                  onChange={(e) => setSsConfig({ ...ssConfig, multiplex_brutal: e.target.checked })}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                {t("enableBrutal")}
-              </label>
+
               {ssConfig.multiplex_brutal && (
-                <div className="grid grid-cols-2 gap-4 ml-6">
-                  <div className="space-y-2">
-                    <Label>{t("upMbps")}</Label>
+                <div className="grid grid-cols-2 gap-4 pl-6 border-l-2 border-blue-500/20 animate-in fade-in slide-in-from-left-1 duration-200">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("upMbps")}</Label>
                     <Input
                       type="number"
                       value={ssConfig.multiplex_brutal_up}
                       onChange={(e) => setSsConfig({ ...ssConfig, multiplex_brutal_up: parseInt(e.target.value) || 0 })}
+                      className="h-9 text-sm"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>{t("downMbps")}</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{t("downMbps")}</Label>
                     <Input
                       type="number"
                       value={ssConfig.multiplex_brutal_down}
                       onChange={(e) => setSsConfig({ ...ssConfig, multiplex_brutal_down: parseInt(e.target.value) || 0 })}
+                      className="h-9 text-sm"
                     />
                   </div>
                 </div>

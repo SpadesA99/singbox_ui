@@ -21,7 +21,7 @@ export function ServerCard({ server, index, expanded, onToggleExpand, onUpdate, 
   const { t: tc } = useTranslation("common")
 
   return (
-    <div className="border rounded-lg p-3 space-y-2">
+    <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 space-y-3 bg-white dark:bg-zinc-900/50 shadow-sm hover:shadow-md hover:border-primary/40 transition-all duration-200">
       <div className="flex items-center gap-2">
         <Input
           placeholder={t("serverTag")}

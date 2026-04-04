@@ -2,13 +2,27 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Plus, Trash2, Key, QrCode, Download } from "lucide-react"
 import { isValidPort, parsePort, parseErrorResponse } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n"
 import { ProtocolFormProps, LocalPeer } from "./types"
+
+function parseKeepaliveSeconds(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return Math.floor(value)
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase()
+    if (!normalized) return undefined
+    const match = normalized.match(/^(\d+)(s)?$/)
+    if (!match) return undefined
+    const parsed = parseInt(match[1], 10)
+    if (parsed > 0) return parsed
+  }
+  return undefined
+}
 
 export function WireguardForm({
   initialConfig,
@@ -38,7 +52,7 @@ export function WireguardForm({
       privateKey: peer.private_key,
       presharedKey: peer.pre_shared_key || "",
       allowedIPs: peer.allowed_ips || [],
-      persistentKeepaliveInterval: peer.persistent_keepalive_interval || "",
+      persistentKeepaliveInterval: parseKeepaliveSeconds(peer.persistent_keepalive_interval),
     }))
     setWgConfig({
       listen_port: wgEndpoint?.listen_port || initialConfig?.listen_port || 5353,
@@ -61,7 +75,9 @@ export function WireguardForm({
           allowed_ips: p.allowedIPs,
         }
         if (p.presharedKey) peer.pre_shared_key = p.presharedKey
-        if (p.persistentKeepaliveInterval) peer.persistent_keepalive_interval = p.persistentKeepaliveInterval
+        if (typeof p.persistentKeepaliveInterval === "number" && p.persistentKeepaliveInterval > 0) {
+          peer.persistent_keepalive_interval = p.persistentKeepaliveInterval
+        }
         return peer
       })
 
@@ -171,7 +187,9 @@ AllowedIPs = 0.0.0.0/0, ::/0
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ clientIndex: peerIndex + 1, configContent }),
             })
-          } catch {}
+          } catch (err) {
+            console.warn("Failed to save client config file:", err)
+          }
         }
       }
     } catch (err) {
@@ -267,7 +285,7 @@ PersistentKeepalive = 25`
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="space-y-2">
           <Label>{tc("port")}</Label>
           <Input
@@ -279,10 +297,10 @@ PersistentKeepalive = 25`
               const port = parsePort(e.target.value, wgConfig.listen_port)
               setWgConfig({ ...wgConfig, listen_port: port })
             }}
-            className={!isValidPort(wgConfig.listen_port) ? "border-red-500" : ""}
+            className={!isValidPort(wgConfig.listen_port) ? "border-red-500 h-9 text-sm" : "h-9 text-sm"}
           />
           {!isValidPort(wgConfig.listen_port) && (
-            <p className="text-xs text-red-500">{t("portRange")}</p>
+            <p className="text-[10px] text-red-500">{t("portRange")}</p>
           )}
         </div>
         <div className="space-y-2">
@@ -291,6 +309,7 @@ PersistentKeepalive = 25`
             value={wgConfig.local_address}
             onChange={(e) => setWgConfig({ ...wgConfig, local_address: e.target.value })}
             placeholder="10.10.0.1/32"
+            className="h-9 text-sm"
           />
         </div>
         <div className="space-y-2">
@@ -299,32 +318,35 @@ PersistentKeepalive = 25`
             type="number"
             value={wgConfig.mtu}
             onChange={(e) => setWgConfig({ ...wgConfig, mtu: parseInt(e.target.value) || 1420 })}
+            className="h-9 text-sm"
+          />
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>{t("privateKey")}</Label>
+            <Button type="button" size="sm" variant="ghost" className="h-5 px-1 text-[10px]" onClick={generateWireGuardKeys}>
+              <Key className="h-3 w-3 mr-1" />
+              {t("generateKey")}
+            </Button>
+          </div>
+          <Input
+            value={wgConfig.private_key}
+            onChange={(e) => setWgConfig({ ...wgConfig, private_key: e.target.value })}
+            placeholder={t("clickToGenerate")}
+            readOnly
+            className="font-mono h-9 text-xs bg-muted"
           />
         </div>
       </div>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>{t("privateKey")}</Label>
-          <Button type="button" size="sm" variant="outline" onClick={generateWireGuardKeys}>
-            <Key className="h-4 w-4 mr-1" />
-            {t("generateKey")}
-          </Button>
-        </div>
-        <Input
-          value={wgConfig.private_key}
-          onChange={(e) => setWgConfig({ ...wgConfig, private_key: e.target.value })}
-          placeholder={t("clickToGenerate")}
-          readOnly
-          className="font-mono text-xs"
-        />
-      </div>
 
-      <div className="space-y-2">
+      <div className="space-y-4 pt-4 border-t border-border/50">
         <div className="flex items-center justify-between">
-          <Label>{t("peers")}</Label>
+          <div>
+            <Label className="text-base font-medium">{t("peers")}</Label>
+            <p className="text-xs text-muted-foreground">{t("managePeers")}</p>
+          </div>
           <Button
             size="sm"
-            variant="outline"
             onClick={() => {
               const nextIP = findNextAvailableIP()
               setWgConfig({
@@ -333,103 +355,126 @@ PersistentKeepalive = 25`
               })
             }}
           >
-            <Plus className="h-4 w-4 mr-1" />
+            <Plus className="h-4 w-4 mr-1.5" />
             {tc("add")}
           </Button>
         </div>
 
-        {wgConfig.peers.map((peer, index) => (
-          <Card key={index} className="p-3">
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label className="text-sm">Peer {index + 1}</Label>
-                <div className="flex gap-2">
-                  <Button type="button" size="sm" variant="outline" onClick={() => generatePeerKeys(index)}>
-                    <Key className="h-4 w-4 mr-1" />
-                    {t("generateKey")}
-                  </Button>
-                  {peer.privateKey && (
-                    <>
-                      <Button type="button" size="sm" variant="outline" onClick={() => showPeerQrCode(index)}>
-                        <QrCode className="h-4 w-4 mr-1" />
-                        {t("qrCode")}
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => downloadPeerConfig(index)}>
-                        {t("downloadConfig")}
-                      </Button>
-                    </>
-                  )}
-                  {wgConfig.peers.length > 1 && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() =>
-                        setWgConfig({
-                          ...wgConfig,
-                          peers: wgConfig.peers.filter((_, i) => i !== index),
-                        })
-                      }
-                    >
-                      <Trash2 className="h-4 w-4" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
+          {wgConfig.peers.map((peer, index) => (
+            <div key={index} className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative group transition-all duration-300">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center mb-1">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                      {index + 1}
+                    </div>
+                    <Label className="text-sm font-semibold tracking-tight text-zinc-700 dark:text-zinc-300">Peer {index + 1}</Label>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-zinc-400 hover:text-primary hover:bg-primary/5 rounded-full" onClick={() => generatePeerKeys(index)} title={t("generateKey")}>
+                      <Key className="h-4 w-4" />
                     </Button>
-                  )}
+                    {peer.privateKey && (
+                      <>
+                        <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-zinc-400 hover:text-primary hover:bg-primary/5 rounded-full" onClick={() => showPeerQrCode(index)} title={t("qrCode")}>
+                          <QrCode className="h-4 w-4" />
+                        </Button>
+                        <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-zinc-400 hover:text-primary hover:bg-primary/5 rounded-full" onClick={() => downloadPeerConfig(index)} title={t("downloadConfig")}>
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                    {wgConfig.peers.length > 1 && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-zinc-400 hover:text-destructive hover:bg-destructive/5 rounded-full"
+                        onClick={() =>
+                          setWgConfig({
+                            ...wgConfig,
+                            peers: wgConfig.peers.filter((_, i) => i !== index),
+                          })
+                        }
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs">{t("publicKeyLabel")}</Label>
-                <Input
-                  placeholder={t("clickGenerateKey")}
-                  value={peer.publicKey}
-                  readOnly
-                  className="font-mono text-xs"
-                />
-              </div>
-              {peer.privateKey && (
+                
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">{t("privateKeyPeer")}</Label>
-                  <Input value={peer.privateKey} readOnly className="font-mono text-xs bg-muted" />
+                  <Label className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold ml-1">{t("configuration")}</Label>
+                  <div className="space-y-3 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-zinc-500">{t("publicKeyLabel")}</Label>
+                      <Input
+                        placeholder={t("clickGenerateKey")}
+                        value={peer.publicKey}
+                        readOnly
+                        className="font-mono h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus-visible:ring-primary/20"
+                      />
+                    </div>
+                    
+                    {peer.privateKey && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-zinc-500">{t("privateKeyPeer")}</Label>
+                        <Input value={peer.privateKey} readOnly className="font-mono h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus-visible:ring-primary/20" />
+                      </div>
+                    )}
+                    
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-zinc-500">{t("allowedIpComma")}</Label>
+                      <Input
+                        placeholder="10.10.0.2/32"
+                        value={peer.allowedIPs.join(", ")}
+                        onChange={(e) => {
+                          const newPeers = [...wgConfig.peers]
+                          newPeers[index].allowedIPs = e.target.value.split(",").map((s) => s.trim())
+                          setWgConfig({ ...wgConfig, peers: newPeers })
+                        }}
+                        className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus-visible:ring-primary/20"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-zinc-500">{t("presharedKeyLabel")}</Label>
+                        <Input
+                          placeholder={t("presharedKeyOptional")}
+                          value={peer.presharedKey || ""}
+                          onChange={(e) => {
+                            const newPeers = [...wgConfig.peers]
+                            newPeers[index].presharedKey = e.target.value
+                            setWgConfig({ ...wgConfig, peers: newPeers })
+                          }}
+                          className="font-mono h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus-visible:ring-primary/20"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-zinc-500">{t("persistentKeepalive")}</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          max="65535"
+                          placeholder="25"
+                          value={peer.persistentKeepaliveInterval ?? ""}
+                          onChange={(e) => {
+                            const newPeers = [...wgConfig.peers]
+                            const value = parseInt(e.target.value, 10)
+                            newPeers[index].persistentKeepaliveInterval = Number.isFinite(value) && value > 0 ? value : undefined
+                            setWgConfig({ ...wgConfig, peers: newPeers })
+                          }}
+                          className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus-visible:ring-primary/20"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
-              <div className="space-y-2">
-                <Label className="text-xs">{t("allowedIpComma")}</Label>
-                <Input
-                  placeholder="0.0.0.0/0"
-                  value={peer.allowedIPs.join(", ")}
-                  onChange={(e) => {
-                    const newPeers = [...wgConfig.peers]
-                    newPeers[index].allowedIPs = e.target.value.split(",").map((s) => s.trim())
-                    setWgConfig({ ...wgConfig, peers: newPeers })
-                  }}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs">{t("presharedKeyLabel")}</Label>
-                <Input
-                  placeholder={t("presharedKeyOptional")}
-                  value={peer.presharedKey || ""}
-                  onChange={(e) => {
-                    const newPeers = [...wgConfig.peers]
-                    newPeers[index].presharedKey = e.target.value
-                    setWgConfig({ ...wgConfig, peers: newPeers })
-                  }}
-                  className="font-mono text-xs"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs">{t("persistentKeepalive")}</Label>
-                <Input
-                  placeholder="25s"
-                  value={peer.persistentKeepaliveInterval || ""}
-                  onChange={(e) => {
-                    const newPeers = [...wgConfig.peers]
-                    newPeers[index].persistentKeepaliveInterval = e.target.value
-                    setWgConfig({ ...wgConfig, peers: newPeers })
-                  }}
-                />
               </div>
             </div>
-          </Card>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   )

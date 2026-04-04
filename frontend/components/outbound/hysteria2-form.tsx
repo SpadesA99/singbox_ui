@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { useTranslation } from "@/lib/i18n"
 import { OutboundFormProps } from "./types"
@@ -144,15 +145,16 @@ export function Hysteria2Form({ initialConfig, setOutbound }: OutboundFormProps)
         </div>
         <div className="space-y-2">
           <Label>{t("networkProtocol")}</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={hy2Config.network}
-            onChange={(e) => setHy2Config({ ...hy2Config, network: e.target.value })}
-          >
-            <option value="">{t("allDefault")}</option>
-            <option value="tcp">{t("tcpOnly")}</option>
-            <option value="udp">{t("udpOnly")}</option>
-          </select>
+          <Select value={(hy2Config.network) || "none"} onValueChange={(val) => { setHy2Config({ ...hy2Config, network: (val === "none" ? "" : val)  }) }}>
+                <SelectTrigger className="h-9 w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-primary/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t("allDefault")}</SelectItem>
+                  <SelectItem value="tcp">{t("tcpOnly")}</SelectItem>
+                  <SelectItem value="udp">{t("udpOnly")}</SelectItem>
+                </SelectContent>
+              </Select>
         </div>
       </div>
       <div className="space-y-2">
@@ -176,14 +178,15 @@ export function Hysteria2Form({ initialConfig, setOutbound }: OutboundFormProps)
       <div className="border-t pt-4 mt-4">
         <div className="space-y-2 mb-4">
           <Label className="font-semibold">{t("quicObfs")}</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={hy2Config.obfs_type}
-            onChange={(e) => setHy2Config({ ...hy2Config, obfs_type: e.target.value })}
-          >
-            <option value="">{tc("disabled")}</option>
-            <option value="salamander">Salamander</option>
-          </select>
+          <Select value={(hy2Config.obfs_type) || "none"} onValueChange={(val) => { setHy2Config({ ...hy2Config, obfs_type: (val === "none" ? "" : val)  }) }}>
+                <SelectTrigger className="h-9 w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-primary/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{tc("disabled")}</SelectItem>
+                  <SelectItem value="salamander">Salamander</SelectItem>
+                </SelectContent>
+              </Select>
         </div>
         {hy2Config.obfs_type === "salamander" && (
           <div className="space-y-2">

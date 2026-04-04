@@ -32,6 +32,8 @@ import { ShadowtlsForm } from "./shadowtls-form"
 import { AnytlsForm } from "./anytls-form"
 import { HttpForm } from "./http-form"
 
+const tabTriggerClass = "rounded-lg px-4 py-2 text-sm font-medium data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-foreground dark:data-[state=active]:text-zinc-100 data-[state=active]:shadow-sm transition-all"
+
 interface InboundConfigProps {
   showCard?: boolean
 }
@@ -174,37 +176,37 @@ export function InboundConfig({ showCard = true }: InboundConfigProps) {
   }
 
   const content = (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <Tabs value={protocol} onValueChange={setProtocol} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="wireguard">WireGuard</TabsTrigger>
-          <TabsTrigger value="socks5">Mixed</TabsTrigger>
-          <TabsTrigger value="vless">VLESS</TabsTrigger>
-          <TabsTrigger value="vmess">VMess</TabsTrigger>
-          <TabsTrigger value="trojan">Trojan</TabsTrigger>
-          <TabsTrigger value="shadowsocks">Shadowsocks</TabsTrigger>
-        </TabsList>
-        <TabsList className="grid w-full grid-cols-6 mt-1">
-          <TabsTrigger value="hysteria2">Hysteria2</TabsTrigger>
-          <TabsTrigger value="tuic">TUIC</TabsTrigger>
-          <TabsTrigger value="naive">Naive</TabsTrigger>
-          <TabsTrigger value="shadowtls">ShadowTLS</TabsTrigger>
-          <TabsTrigger value="anytls">AnyTLS</TabsTrigger>
-          <TabsTrigger value="http">HTTP</TabsTrigger>
+        <TabsList className="flex flex-wrap h-auto w-full justify-start gap-1 p-1 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-sm">
+          <TabsTrigger className={tabTriggerClass} value="wireguard">WireGuard</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="socks5">Mixed</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="vless">VLESS</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="vmess">VMess</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="trojan">Trojan</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="shadowsocks">Shadowsocks</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="hysteria2">Hysteria2</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="tuic">TUIC</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="naive">Naive</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="shadowtls">ShadowTLS</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="anytls">AnyTLS</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="http">HTTP</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="socks5"><MixedForm {...formProps} /></TabsContent>
-        <TabsContent value="vless"><VlessForm {...formProps} /></TabsContent>
-        <TabsContent value="wireguard"><WireguardForm {...formProps} /></TabsContent>
-        <TabsContent value="shadowsocks"><ShadowsocksForm {...formProps} /></TabsContent>
-        <TabsContent value="hysteria2"><Hysteria2Form {...formProps} /></TabsContent>
-        <TabsContent value="vmess"><VmessForm {...formProps} /></TabsContent>
-        <TabsContent value="trojan"><TrojanForm {...formProps} /></TabsContent>
-        <TabsContent value="tuic"><TuicForm {...formProps} /></TabsContent>
-        <TabsContent value="naive"><NaiveForm {...formProps} /></TabsContent>
-        <TabsContent value="shadowtls"><ShadowtlsForm {...formProps} /></TabsContent>
-        <TabsContent value="anytls"><AnytlsForm {...formProps} /></TabsContent>
-        <TabsContent value="http"><HttpForm {...formProps} /></TabsContent>
+        <div className="pt-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <TabsContent value="socks5"><MixedForm {...formProps} /></TabsContent>
+          <TabsContent value="vless"><VlessForm {...formProps} /></TabsContent>
+          <TabsContent value="wireguard"><WireguardForm {...formProps} /></TabsContent>
+          <TabsContent value="shadowsocks"><ShadowsocksForm {...formProps} /></TabsContent>
+          <TabsContent value="hysteria2"><Hysteria2Form {...formProps} /></TabsContent>
+          <TabsContent value="vmess"><VmessForm {...formProps} /></TabsContent>
+          <TabsContent value="trojan"><TrojanForm {...formProps} /></TabsContent>
+          <TabsContent value="tuic"><TuicForm {...formProps} /></TabsContent>
+          <TabsContent value="naive"><NaiveForm {...formProps} /></TabsContent>
+          <TabsContent value="shadowtls"><ShadowtlsForm {...formProps} /></TabsContent>
+          <TabsContent value="anytls"><AnytlsForm {...formProps} /></TabsContent>
+          <TabsContent value="http"><HttpForm {...formProps} /></TabsContent>
+        </div>
       </Tabs>
 
       {error && (
