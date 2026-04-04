@@ -15,12 +15,23 @@ interface DnsConfigProps {
   showCard?: boolean
 }
 
+// Filter servers that are valid for sing-box (incomplete entries are kept in draft state only)
+function filterValidServers(servers: DnsServer[]): DnsServer[] {
+  return servers.filter(
+    (s) => s.tag && (s.type === "local" || s.type === "fakeip" || s.type === "dhcp" || s.type === "hosts" || s.server)
+  )
+}
+
 export function DnsConfigComponent({ showCard = true }: DnsConfigProps) {
   const { t } = useTranslation("dns")
   const { config, setDns } = useSingboxConfigStore()
   const dns = config.dns || {}
-  const servers: DnsServer[] = dns.servers || []
-  const rules: DnsRule[] = dns.rules || []
+
+  // Draft local state: servers and rules may include incomplete entries being edited
+  const [servers, setServers] = useState<DnsServer[]>(() => dns.servers || [])
+  const [rules, setRules] = useState<DnsRule[]>(() => dns.rules || [])
+
+  // Scalar config values: read/write directly from store (no draft needed)
   const finalServer: string = dns.final || ""
   const independentCache: boolean = dns.independent_cache ?? true
 
@@ -29,17 +40,32 @@ export function DnsConfigComponent({ showCard = true }: DnsConfigProps) {
 
   const availableServerTags = servers.filter((s) => s.tag).map((s) => s.tag)
 
+  // Write validated config to store (filters incomplete servers, cleans up empty arrays)
+  function commitDns(srv: DnsServer[], rls: DnsRule[], final: string, cache: boolean) {
+    setDns({
+      servers: filterValidServers(srv),
+      rules: rls.length > 0 ? rls : undefined,
+      final: final || undefined,
+      independent_cache: cache,
+    })
+  }
+
   const addServer = () => {
-    setDns({ ...dns, servers: [...servers, { tag: `dns_${servers.length + 1}`, server: "", type: "udp" as const }] })
+    const next = [...servers, { tag: `dns_${servers.length + 1}`, server: "", type: "udp" as const }]
+    setServers(next)
+    commitDns(next, rules, finalServer, independentCache)
   }
 
   const removeServer = (index: number) => {
-    setDns({ ...dns, servers: servers.filter((_, i) => i !== index) })
+    const next = servers.filter((_, i) => i !== index)
+    setServers(next)
+    commitDns(next, rules, finalServer, independentCache)
   }
 
   const updateServer = (index: number, field: keyof DnsServer, value: any) => {
-    const updated = servers.map((s, i) => (i === index ? { ...s, [field]: value } : s))
-    setDns({ ...dns, servers: updated })
+    const next = servers.map((s, i) => (i === index ? { ...s, [field]: value } : s))
+    setServers(next)
+    commitDns(next, rules, finalServer, independentCache)
   }
 
   const toggleServerExpanded = (index: number) => {
@@ -50,16 +76,21 @@ export function DnsConfigComponent({ showCard = true }: DnsConfigProps) {
   }
 
   const addRule = () => {
-    setDns({ ...dns, rules: [...rules, { action: "route" as const, server: availableServerTags[0] || "" }] })
+    const next = [...rules, { action: "route" as const, server: availableServerTags[0] || "" }]
+    setRules(next)
+    commitDns(servers, next, finalServer, independentCache)
   }
 
   const removeRule = (index: number) => {
-    setDns({ ...dns, rules: rules.filter((_, i) => i !== index) })
+    const next = rules.filter((_, i) => i !== index)
+    setRules(next)
+    commitDns(servers, next, finalServer, independentCache)
   }
 
   const updateRule = (index: number, field: keyof DnsRule, value: any) => {
-    const updated = rules.map((r, i) => (i === index ? { ...r, [field]: value } : r))
-    setDns({ ...dns, rules: updated })
+    const next = rules.map((r, i) => (i === index ? { ...r, [field]: value } : r))
+    setRules(next)
+    commitDns(servers, next, finalServer, independentCache)
   }
 
   const updateRuleArray = (
@@ -67,7 +98,7 @@ export function DnsConfigComponent({ showCard = true }: DnsConfigProps) {
     field: "domain" | "domain_suffix" | "rule_set" | "query_type",
     value: string
   ) => {
-    const updated = rules.map((r, i) => {
+    const next = rules.map((r, i) => {
       if (i !== index) return r
       if (field === "query_type") {
         const nums = value
@@ -83,7 +114,8 @@ export function DnsConfigComponent({ showCard = true }: DnsConfigProps) {
         return { ...r, [field]: arr.length > 0 ? arr : undefined }
       }
     })
-    setDns({ ...dns, rules: updated })
+    setRules(next)
+    commitDns(servers, next, finalServer, independentCache)
   }
 
   const toggleRuleExpanded = (index: number) => {
@@ -94,11 +126,13 @@ export function DnsConfigComponent({ showCard = true }: DnsConfigProps) {
   }
 
   const handleApplyTemplate = (templateServers: DnsServer[], templateRules: DnsRule[], templateFinal: string) => {
-    setDns({ ...dns, servers: templateServers, rules: templateRules, final: templateFinal })
+    setServers(templateServers)
+    setRules(templateRules)
+    commitDns(templateServers, templateRules, templateFinal, independentCache)
   }
 
-  const setFinalServer = (val: string) => setDns({ ...dns, final: val || undefined })
-  const setIndependentCache = (val: boolean) => setDns({ ...dns, independent_cache: val })
+  const setFinalServer = (val: string) => commitDns(servers, rules, val, independentCache)
+  const setIndependentCache = (val: boolean) => commitDns(servers, rules, finalServer, val)
 
   const content = (
     <div className="space-y-4">

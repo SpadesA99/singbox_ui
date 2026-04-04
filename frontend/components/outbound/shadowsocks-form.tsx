@@ -1,6 +1,5 @@
 "use client"
 
-import { useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
@@ -88,10 +87,10 @@ export function ShadowsocksForm({ initialConfig, setOutbound }: OutboundFormProp
 
   const flat = deriveFlat(initialConfig)
 
-  const updateOutbound = useCallback((patch: Partial<SsFlat>) => {
+  function updateOutbound(patch: Partial<SsFlat>) {
     const merged = { ...flat, ...patch }
     setOutbound(0, buildSsOutbound(merged))
-  }, [flat, setOutbound])
+  }
 
   return (
     <div className="space-y-6">

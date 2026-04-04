@@ -1,6 +1,5 @@
 "use client"
 
-import { useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useTranslation } from "@/lib/i18n"
@@ -77,10 +76,10 @@ export function WireguardForm({ initialConfig, setOutbound }: OutboundFormProps)
 
   const flat = deriveFlat(initialConfig)
 
-  const updateOutbound = useCallback((patch: Partial<WgFlat>) => {
+  function updateOutbound(patch: Partial<WgFlat>) {
     const merged = { ...flat, ...patch }
     setOutbound(0, buildWgOutbound(merged))
-  }, [flat, setOutbound])
+  }
 
   return (
     <div className="space-y-6">

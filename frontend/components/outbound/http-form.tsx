@@ -1,6 +1,5 @@
 "use client"
 
-import { useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useTranslation } from "@/lib/i18n"
@@ -70,10 +69,10 @@ export function HttpForm({ initialConfig, setOutbound }: OutboundFormProps) {
 
   const flat = deriveFlat(initialConfig)
 
-  const updateOutbound = useCallback((patch: Partial<HttpFlat>) => {
+  function updateOutbound(patch: Partial<HttpFlat>) {
     const merged = { ...flat, ...patch }
     setOutbound(0, buildHttpOutbound(merged))
-  }, [flat, setOutbound])
+  }
 
   return (
     <div className="space-y-4">

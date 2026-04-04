@@ -109,7 +109,7 @@ function deriveFlat(initialConfig: any): VmessFlat {
   }
 }
 
-function buildVmessInbound(flat: VmessFlat, realityPublicKey: string): any {
+function buildVmessInbound(flat: VmessFlat): any {
   const vmessUsers = flat.users
     .filter((u) => u.uuid)
     .map((u) => {
@@ -243,7 +243,7 @@ export function VmessForm({
   function updateInbound(patch: Partial<VmessFlat>) {
     const newFlat = { ...flat, ...patch }
     clearEndpoints()
-    setInbound(0, buildVmessInbound(newFlat, realityPublicKey))
+    setInbound(0, buildVmessInbound(newFlat))
   }
 
   const showVmessQrCode = async (userIndex: number) => {

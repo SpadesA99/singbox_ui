@@ -1,6 +1,5 @@
 "use client"
 
-import { useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
@@ -166,10 +165,10 @@ export function VmessForm({ initialConfig, setOutbound }: OutboundFormProps) {
 
   const flat = deriveFlat(initialConfig)
 
-  const updateOutbound = useCallback((patch: Partial<VmessFlat>) => {
+  function updateOutbound(patch: Partial<VmessFlat>) {
     const merged = { ...flat, ...patch }
     setOutbound(0, buildVmessOutbound(merged))
-  }, [flat, setOutbound])
+  }
 
   return (
     <div className="space-y-6">

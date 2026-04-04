@@ -107,7 +107,7 @@ function deriveFlat(initialConfig: any): VlessFlat {
   }
 }
 
-function buildVlessInbound(flat: VlessFlat, realityPublicKey: string): any {
+function buildVlessInbound(flat: VlessFlat): any {
   const vlessUsers = flat.users
     .filter((u) => u.uuid)
     .map((u) => {
@@ -242,7 +242,7 @@ export function VlessForm({
   function updateInbound(patch: Partial<VlessFlat>) {
     const newFlat = { ...flat, ...patch }
     clearEndpoints()
-    setInbound(0, buildVlessInbound(newFlat, realityPublicKey))
+    setInbound(0, buildVlessInbound(newFlat))
   }
 
   const showVlessQrCode = async (userIndex: number) => {

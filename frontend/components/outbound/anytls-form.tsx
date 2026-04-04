@@ -1,6 +1,5 @@
 "use client"
 
-import { useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
@@ -70,10 +69,10 @@ export function AnytlsForm({ initialConfig, setOutbound }: OutboundFormProps) {
 
   const flat = deriveFlat(initialConfig)
 
-  const updateOutbound = useCallback((patch: Partial<AnytlsFlat>) => {
+  function updateOutbound(patch: Partial<AnytlsFlat>) {
     const merged = { ...flat, ...patch }
     setOutbound(0, buildAnytlsOutbound(merged))
-  }, [flat, setOutbound])
+  }
 
   return (
     <div className="space-y-4">

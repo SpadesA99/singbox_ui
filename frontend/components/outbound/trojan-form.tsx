@@ -1,6 +1,5 @@
 "use client"
 
-import { useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
@@ -147,10 +146,10 @@ export function TrojanForm({ initialConfig, setOutbound }: OutboundFormProps) {
 
   const flat = deriveFlat(initialConfig)
 
-  const updateOutbound = useCallback((patch: Partial<TrojanFlat>) => {
+  function updateOutbound(patch: Partial<TrojanFlat>) {
     const merged = { ...flat, ...patch }
     setOutbound(0, buildTrojanOutbound(merged))
-  }, [flat, setOutbound])
+  }
 
   return (
     <div className="space-y-6">

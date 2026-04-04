@@ -1,6 +1,5 @@
 "use client"
 
-import { useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
@@ -77,10 +76,10 @@ export function Hysteria2Form({ initialConfig, setOutbound }: OutboundFormProps)
 
   const flat = deriveFlat(initialConfig)
 
-  const updateOutbound = useCallback((patch: Partial<Hy2Flat>) => {
+  function updateOutbound(patch: Partial<Hy2Flat>) {
     const merged = { ...flat, ...patch }
     setOutbound(0, buildHy2Outbound(merged))
-  }, [flat, setOutbound])
+  }
 
   return (
     <div className="space-y-4">
