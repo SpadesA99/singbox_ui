@@ -114,7 +114,15 @@ export default function Home() {
   const hasConfig = (config.inbounds?.length ?? 0) > 0 || (config.outbounds?.length ?? 0) > 0
 
   useEffect(() => {
-    loadInstances()
+    const init = async () => {
+      await loadInstances()
+      // Restore previously selected instance after page refresh
+      const saved = localStorage.getItem("singbox_instance")
+      if (saved) {
+        await loadInstanceConfig(saved)
+      }
+    }
+    init()
     checkSingboxVersion()
     const interval = setInterval(loadInstances, 5000)
     return () => clearInterval(interval)
@@ -137,6 +145,7 @@ export default function Home() {
     if (instanceName === currentInstance) return
     const loaded = await loadInstanceConfig(instanceName)
     if (loaded) {
+      localStorage.setItem("singbox_instance", instanceName)
       toast({
         title: t("configLoaded"),
         description: t("configLoadedDesc", { name: instanceName }),
@@ -235,6 +244,9 @@ export default function Home() {
     if (!instanceToDelete) return
     const success = await deleteInstance(instanceToDelete)
     if (success) {
+      if (localStorage.getItem("singbox_instance") === instanceToDelete) {
+        localStorage.removeItem("singbox_instance")
+      }
       toast({ title: t("deleteSuccess"), description: t("deleteSuccessDesc", { name: instanceToDelete }) })
     } else {
       toast({ title: t("deleteFailed"), description: t("deleteFailedDesc"), variant: "destructive" })
