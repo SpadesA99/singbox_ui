@@ -25,7 +25,7 @@ export function JsonEditor({ value, onChange, readOnly = false, height = "500px"
   }, [onChange])
 
   return (
-    <div className="border rounded-lg overflow-hidden bg-[#1e1e1e]">
+    <div className="h-full border rounded-lg overflow-hidden bg-[#1e1e1e]">
       <Editor
         height={height}
         defaultLanguage="json"
