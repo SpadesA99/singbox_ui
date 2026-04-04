@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,95 @@ import { Plus, Trash2, Key } from "lucide-react"
 import { isValidPort, parsePort, isValidListenAddress, generateSecureRandomString } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n"
 import { ProtocolFormProps, ShadowTLSUser, formatListen, parseListen } from "./types"
+
+interface ShadowtlsFlat {
+  listen: string
+  listen_port: number
+  version: number
+  password: string
+  users: ShadowTLSUser[]
+  handshake_server: string
+  handshake_server_port: number
+  handshake_detour: string
+  strict_mode: boolean
+  handshake_for_server_name: Record<string, { server: string; server_port: number }>
+  wildcard_sni: "off" | "authed" | "all"
+}
+
+function deriveFlat(initialConfig: any): ShadowtlsFlat {
+  const c = initialConfig?.type === "shadowtls" ? initialConfig : null
+  const shadowtlsUsers = (c?.users || []).map((u: any) => ({
+    name: u.name || "",
+    password: u.password || "",
+  }))
+  const rawSniMap = c?.handshake_for_server_name || {}
+  const sniMap: Record<string, { server: string; server_port: number }> = {}
+  for (const [sni, config] of Object.entries(rawSniMap)) {
+    sniMap[sni] = { server: (config as any).server || "", server_port: (config as any).server_port || 443 }
+  }
+  return {
+    listen: parseListen(c?.listen),
+    listen_port: c?.listen_port || 443,
+    version: c?.version || 3,
+    password: c?.password || "",
+    users: shadowtlsUsers.length > 0 ? shadowtlsUsers : [{ name: "", password: "" }],
+    handshake_server: c?.handshake?.server || "www.google.com",
+    handshake_server_port: c?.handshake?.server_port || 443,
+    handshake_detour: c?.handshake?.detour || "",
+    strict_mode: c?.strict_mode !== false,
+    handshake_for_server_name: sniMap,
+    wildcard_sni: (c?.wildcard_sni || "off") as "off" | "authed" | "all",
+  }
+}
+
+function buildShadowtlsInbound(f: ShadowtlsFlat): any {
+  const previewConfig: any = {
+    type: "shadowtls",
+    tag: "shadowtls-in",
+    listen: formatListen(f.listen),
+    listen_port: f.listen_port,
+    version: f.version,
+    handshake: {
+      server: f.handshake_server,
+      server_port: f.handshake_server_port,
+      ...(f.handshake_detour ? { detour: f.handshake_detour } : {}),
+    },
+  }
+  // v2: 使用顶层 password
+  if (f.version === 2 && f.password) {
+    previewConfig.password = f.password
+  }
+  // v3: 使用 users 数组和 strict_mode
+  if (f.version >= 3) {
+    const shadowtlsUsersPreview = f.users
+      .filter((u) => u.password)
+      .map((u) => {
+        const user: any = { password: u.password }
+        if (u.name) user.name = u.name
+        return user
+      })
+    previewConfig.users = shadowtlsUsersPreview
+    previewConfig.strict_mode = f.strict_mode
+  }
+  if (f.version >= 3 && f.wildcard_sni && f.wildcard_sni !== "off") {
+    previewConfig.wildcard_sni = f.wildcard_sni
+  }
+  if (f.version >= 2) {
+    const sniMap = f.handshake_for_server_name
+    const filteredSniMap: any = {}
+    let hasSni = false
+    for (const [sni, config] of Object.entries(sniMap)) {
+      if (sni && config.server) {
+        filteredSniMap[sni] = { server: config.server, server_port: config.server_port || 443 }
+        hasSni = true
+      }
+    }
+    if (hasSni) {
+      previewConfig.handshake_for_server_name = filteredSniMap
+    }
+  }
+  return previewConfig
+}
 
 export function ShadowtlsForm({
   initialConfig,
@@ -19,109 +108,13 @@ export function ShadowtlsForm({
   const { t } = useTranslation("inbound")
   const { t: tc } = useTranslation("common")
 
-  const [shadowtlsConfig, setShadowtlsConfig] = useState({
-    listen: "0.0.0.0",
-    listen_port: 443,
-    version: 3,
-    password: "", // v2 顶层 password
-    users: [{ name: "", password: "" }] as ShadowTLSUser[], // v3 使用 users
-    handshake_server: "www.google.com",
-    handshake_server_port: 443,
-    handshake_detour: "",
-    strict_mode: true,
-    handshake_for_server_name: {} as Record<string, { server: string; server_port: number }>,
-    wildcard_sni: "off" as "off" | "authed" | "all",
-  })
+  const flat = deriveFlat(initialConfig)
 
-  const [initialized, setInitialized] = useState(false)
-
-  // Load from initialConfig
-  useEffect(() => {
-    if (initialized) return
-    if (!initialConfig || initialConfig.type !== "shadowtls") {
-      setInitialized(true)
-      return
-    }
-    const shadowtlsUsers = (initialConfig.users || []).map((u: any) => ({
-      name: u.name || "",
-      password: u.password || "",
-    }))
-    setShadowtlsConfig({
-      listen: parseListen(initialConfig.listen),
-      listen_port: initialConfig.listen_port || 443,
-      version: initialConfig.version || 3,
-      password: initialConfig.password || "",
-      users: shadowtlsUsers.length > 0 ? shadowtlsUsers : [{ name: "", password: "" }],
-      handshake_server: initialConfig.handshake?.server || "www.google.com",
-      handshake_server_port: initialConfig.handshake?.server_port || 443,
-      handshake_detour: initialConfig.handshake?.detour || "",
-      strict_mode: initialConfig.strict_mode !== false,
-      handshake_for_server_name: (() => {
-        const raw = initialConfig.handshake_for_server_name || {}
-        const result: Record<string, { server: string; server_port: number }> = {}
-        for (const [sni, config] of Object.entries(raw)) {
-          result[sni] = { server: (config as any).server || "", server_port: (config as any).server_port || 443 }
-        }
-        return result
-      })(),
-      wildcard_sni: (initialConfig.wildcard_sni || "off") as "off" | "authed" | "all",
-    })
-    setInitialized(true)
-  }, [initialConfig, initialized])
-
-  // Build and sync preview config
-  useEffect(() => {
-    if (!initialized) return
-
-    const previewConfig: any = {
-      type: "shadowtls",
-      tag: "shadowtls-in",
-      listen: formatListen(shadowtlsConfig.listen),
-      listen_port: shadowtlsConfig.listen_port,
-      version: shadowtlsConfig.version,
-      handshake: {
-        server: shadowtlsConfig.handshake_server,
-        server_port: shadowtlsConfig.handshake_server_port,
-        ...(shadowtlsConfig.handshake_detour ? { detour: shadowtlsConfig.handshake_detour } : {}),
-      },
-    }
-    // v2: 使用顶层 password
-    if (shadowtlsConfig.version === 2 && shadowtlsConfig.password) {
-      previewConfig.password = shadowtlsConfig.password
-    }
-    // v3: 使用 users 数组和 strict_mode
-    if (shadowtlsConfig.version >= 3) {
-      const shadowtlsUsersPreview = shadowtlsConfig.users
-        .filter((u) => u.password)
-        .map((u) => {
-          const user: any = { password: u.password }
-          if (u.name) user.name = u.name
-          return user
-        })
-      previewConfig.users = shadowtlsUsersPreview
-      previewConfig.strict_mode = shadowtlsConfig.strict_mode
-    }
-    if (shadowtlsConfig.version >= 3 && shadowtlsConfig.wildcard_sni && shadowtlsConfig.wildcard_sni !== "off") {
-      previewConfig.wildcard_sni = shadowtlsConfig.wildcard_sni
-    }
-    if (shadowtlsConfig.version >= 2) {
-      const sniMap = shadowtlsConfig.handshake_for_server_name
-      const filteredSniMap: any = {}
-      let hasSni = false
-      for (const [sni, config] of Object.entries(sniMap)) {
-        if (sni && config.server) {
-          filteredSniMap[sni] = { server: config.server, server_port: config.server_port || 443 }
-          hasSni = true
-        }
-      }
-      if (hasSni) {
-        previewConfig.handshake_for_server_name = filteredSniMap
-      }
-    }
-
+  const updateInbound = useCallback((patch: Partial<ShadowtlsFlat>) => {
+    const merged = { ...flat, ...patch }
     clearEndpoints()
-    setInbound(0, previewConfig)
-  }, [shadowtlsConfig, initialized, setInbound, clearEndpoints])
+    setInbound(0, buildShadowtlsInbound(merged))
+  }, [flat, clearEndpoints, setInbound])
 
   return (
     <div className="space-y-4">
@@ -129,9 +122,9 @@ export function ShadowtlsForm({
         <div className="space-y-2">
           <Label>{t("listenAddr")}</Label>
           <Input
-            value={shadowtlsConfig.listen}
-            onChange={(e) => setShadowtlsConfig({ ...shadowtlsConfig, listen: e.target.value })}
-            className={!isValidListenAddress(shadowtlsConfig.listen) ? "border-red-500" : ""}
+            value={flat.listen}
+            onChange={(e) => updateInbound({ listen: e.target.value })}
+            className={!isValidListenAddress(flat.listen) ? "border-red-500" : ""}
           />
         </div>
         <div className="space-y-2">
@@ -140,12 +133,12 @@ export function ShadowtlsForm({
             type="number"
             min="1"
             max="65535"
-            value={shadowtlsConfig.listen_port}
+            value={flat.listen_port}
             onChange={(e) => {
-              const port = parsePort(e.target.value, shadowtlsConfig.listen_port)
-              setShadowtlsConfig({ ...shadowtlsConfig, listen_port: port })
+              const port = parsePort(e.target.value, flat.listen_port)
+              updateInbound({ listen_port: port })
             }}
-            className={!isValidPort(shadowtlsConfig.listen_port) ? "border-red-500" : ""}
+            className={!isValidPort(flat.listen_port) ? "border-red-500" : ""}
           />
         </div>
       </div>
@@ -154,8 +147,8 @@ export function ShadowtlsForm({
         <Label>{t("protocolVersion")}</Label>
         <select
           className="w-full h-9 px-3 rounded-md border border-input bg-transparent"
-          value={shadowtlsConfig.version}
-          onChange={(e) => setShadowtlsConfig({ ...shadowtlsConfig, version: parseInt(e.target.value) })}
+          value={flat.version}
+          onChange={(e) => updateInbound({ version: parseInt(e.target.value) })}
         >
           <option value="1">v1</option>
           <option value="2">v2</option>
@@ -167,8 +160,8 @@ export function ShadowtlsForm({
         <div className="space-y-2">
           <Label>{t("handshakeServer")}</Label>
           <Input
-            value={shadowtlsConfig.handshake_server}
-            onChange={(e) => setShadowtlsConfig({ ...shadowtlsConfig, handshake_server: e.target.value })}
+            value={flat.handshake_server}
+            onChange={(e) => updateInbound({ handshake_server: e.target.value })}
             placeholder="www.google.com"
           />
         </div>
@@ -178,10 +171,10 @@ export function ShadowtlsForm({
             type="number"
             min="1"
             max="65535"
-            value={shadowtlsConfig.handshake_server_port}
+            value={flat.handshake_server_port}
             onChange={(e) => {
-              const port = parsePort(e.target.value, shadowtlsConfig.handshake_server_port)
-              setShadowtlsConfig({ ...shadowtlsConfig, handshake_server_port: port })
+              const port = parsePort(e.target.value, flat.handshake_server_port)
+              updateInbound({ handshake_server_port: port })
             }}
           />
         </div>
@@ -190,26 +183,26 @@ export function ShadowtlsForm({
       <div className="space-y-2">
         <Label>{t("handshakeDetour")}</Label>
         <Input
-          value={shadowtlsConfig.handshake_detour}
-          onChange={(e) => setShadowtlsConfig({ ...shadowtlsConfig, handshake_detour: e.target.value })}
+          value={flat.handshake_detour}
+          onChange={(e) => updateInbound({ handshake_detour: e.target.value })}
           placeholder={t("handshakeDetourHint")}
         />
       </div>
 
-      {shadowtlsConfig.version === 2 && (
+      {flat.version === 2 && (
         <div className="space-y-2">
           <Label>{t("passwordV2")}</Label>
           <div className="flex gap-2">
             <Input
               type="password"
-              value={shadowtlsConfig.password}
-              onChange={(e) => setShadowtlsConfig({ ...shadowtlsConfig, password: e.target.value })}
+              value={flat.password}
+              onChange={(e) => updateInbound({ password: e.target.value })}
               placeholder={t("shadowtlsV2Password")}
             />
             <Button
               size="sm"
               variant="outline"
-              onClick={() => setShadowtlsConfig({ ...shadowtlsConfig, password: generateSecureRandomString(16) })}
+              onClick={() => updateInbound({ password: generateSecureRandomString(16) })}
             >
               <Key className="h-4 w-4" />
             </Button>
@@ -217,13 +210,13 @@ export function ShadowtlsForm({
         </div>
       )}
 
-      {shadowtlsConfig.version >= 3 && (
+      {flat.version >= 3 && (
         <div className="flex items-center gap-2">
           <input
             type="checkbox"
             id="shadowtls-strict-mode"
-            checked={shadowtlsConfig.strict_mode}
-            onChange={(e) => setShadowtlsConfig({ ...shadowtlsConfig, strict_mode: e.target.checked })}
+            checked={flat.strict_mode}
+            onChange={(e) => updateInbound({ strict_mode: e.target.checked })}
             className="h-4 w-4"
           />
           <Label htmlFor="shadowtls-strict-mode">{t("strictMode")}</Label>
@@ -231,13 +224,13 @@ export function ShadowtlsForm({
       )}
 
       {/* Wildcard SNI - v3 only */}
-      {shadowtlsConfig.version >= 3 && (
+      {flat.version >= 3 && (
         <div className="space-y-2">
           <Label>{t("shadowtlsWildcardSni")}</Label>
           <select
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={shadowtlsConfig.wildcard_sni}
-            onChange={(e) => setShadowtlsConfig({ ...shadowtlsConfig, wildcard_sni: e.target.value as "off" | "authed" | "all" })}
+            value={flat.wildcard_sni}
+            onChange={(e) => updateInbound({ wildcard_sni: e.target.value as "off" | "authed" | "all" })}
           >
             <option value="off">{t("disabled")}</option>
             <option value="authed">{t("shadowtlsWildcardAuthed")}</option>
@@ -246,7 +239,7 @@ export function ShadowtlsForm({
         </div>
       )}
 
-      {shadowtlsConfig.version >= 3 && (
+      {flat.version >= 3 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label>{t("usersV3")}</Label>
@@ -254,10 +247,7 @@ export function ShadowtlsForm({
               size="sm"
               variant="outline"
               onClick={() =>
-                setShadowtlsConfig({
-                  ...shadowtlsConfig,
-                  users: [...shadowtlsConfig.users, { name: "", password: "" }],
-                })
+                updateInbound({ users: [...flat.users, { name: "", password: "" }] })
               }
             >
               <Plus className="h-4 w-4 mr-1" />
@@ -265,20 +255,17 @@ export function ShadowtlsForm({
             </Button>
           </div>
 
-          {shadowtlsConfig.users.map((user, index) => (
+          {flat.users.map((user, index) => (
             <Card key={index} className="p-3">
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <Label className="text-sm">{t("userIndex", { n: index + 1 })}</Label>
-                  {shadowtlsConfig.users.length > 1 && (
+                  {flat.users.length > 1 && (
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() =>
-                        setShadowtlsConfig({
-                          ...shadowtlsConfig,
-                          users: shadowtlsConfig.users.filter((_, i) => i !== index),
-                        })
+                        updateInbound({ users: flat.users.filter((_, i) => i !== index) })
                       }
                     >
                       <Trash2 className="h-4 w-4" />
@@ -289,9 +276,9 @@ export function ShadowtlsForm({
                   placeholder={t("nameOptional")}
                   value={user.name || ""}
                   onChange={(e) => {
-                    const newUsers = [...shadowtlsConfig.users]
-                    newUsers[index].name = e.target.value
-                    setShadowtlsConfig({ ...shadowtlsConfig, users: newUsers })
+                    const newUsers = [...flat.users]
+                    newUsers[index] = { ...newUsers[index], name: e.target.value }
+                    updateInbound({ users: newUsers })
                   }}
                 />
                 <div className="flex gap-2">
@@ -299,9 +286,9 @@ export function ShadowtlsForm({
                     placeholder={tc("password")}
                     value={user.password}
                     onChange={(e) => {
-                      const newUsers = [...shadowtlsConfig.users]
-                      newUsers[index].password = e.target.value
-                      setShadowtlsConfig({ ...shadowtlsConfig, users: newUsers })
+                      const newUsers = [...flat.users]
+                      newUsers[index] = { ...newUsers[index], password: e.target.value }
+                      updateInbound({ users: newUsers })
                     }}
                     className="flex-1"
                   />
@@ -310,9 +297,9 @@ export function ShadowtlsForm({
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      const newUsers = [...shadowtlsConfig.users]
-                      newUsers[index].password = generateSecureRandomString(16)
-                      setShadowtlsConfig({ ...shadowtlsConfig, users: newUsers })
+                      const newUsers = [...flat.users]
+                      newUsers[index] = { ...newUsers[index], password: generateSecureRandomString(16) }
+                      updateInbound({ users: newUsers })
                     }}
                   >
                     <Key className="h-4 w-4" />

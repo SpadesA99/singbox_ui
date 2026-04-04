@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,6 +10,201 @@ import { isValidPort, parsePort, isValidListenAddress } from "@/lib/utils"
 import { apiClient } from "@/lib/api"
 import { useTranslation } from "@/lib/i18n"
 import { ProtocolFormProps, VLESSUser, formatListen, parseListen, getPublicIP } from "./types"
+
+interface VlessFlat {
+  listen: string
+  listen_port: number
+  users: VLESSUser[]
+  tls_enabled: boolean
+  tls_mode: "manual" | "acme" | "reality"
+  tls_acme_domain: string
+  tls_certificate_path: string
+  tls_key_path: string
+  tls_server_name: string
+  reality_handshake_server: string
+  reality_handshake_port: number
+  reality_private_key: string
+  reality_short_id: string
+  transport_type: string
+  transport_path: string
+  transport_service_name: string
+  multiplex_enabled: boolean
+  multiplex_padding: boolean
+  multiplex_brutal: boolean
+  multiplex_brutal_up: number
+  multiplex_brutal_down: number
+  tls_alpn: string
+  transport_host: string
+  ws_max_early_data: number
+  ws_early_data_header_name: string
+}
+
+function deriveFlat(initialConfig: any): VlessFlat {
+  if (!initialConfig || initialConfig.type !== "vless") {
+    return {
+      listen: "0.0.0.0",
+      listen_port: 443,
+      users: [{ uuid: "", name: "", flow: "" }],
+      tls_enabled: false,
+      tls_mode: "manual",
+      tls_acme_domain: "",
+      tls_certificate_path: "/etc/sing-box/cert.pem",
+      tls_key_path: "/etc/sing-box/key.pem",
+      tls_server_name: "",
+      reality_handshake_server: "",
+      reality_handshake_port: 443,
+      reality_private_key: "",
+      reality_short_id: "",
+      transport_type: "tcp",
+      transport_path: "",
+      transport_service_name: "",
+      multiplex_enabled: false,
+      multiplex_padding: false,
+      multiplex_brutal: false,
+      multiplex_brutal_up: 0,
+      multiplex_brutal_down: 0,
+      tls_alpn: "",
+      transport_host: "",
+      ws_max_early_data: 0,
+      ws_early_data_header_name: "",
+    }
+  }
+  const vlessUsers = (initialConfig.users || []).map((u: any) => ({
+    uuid: u.uuid || "",
+    name: u.name || "",
+    flow: u.flow || "",
+  }))
+  return {
+    listen: parseListen(initialConfig.listen),
+    listen_port: initialConfig.listen_port || 443,
+    users: vlessUsers.length > 0 ? vlessUsers : [{ uuid: "", name: "", flow: "" }],
+    tls_enabled: initialConfig.tls?.enabled || false,
+    tls_mode: initialConfig.tls?.reality?.enabled
+      ? "reality"
+      : (initialConfig.tls?.acme?.domain?.length ?? 0) > 0
+      ? "acme"
+      : "manual",
+    tls_acme_domain: initialConfig.tls?.acme?.domain?.[0] || "",
+    tls_certificate_path: initialConfig.tls?.certificate_path || "/etc/sing-box/cert.pem",
+    tls_key_path: initialConfig.tls?.key_path || "/etc/sing-box/key.pem",
+    tls_server_name: initialConfig.tls?.server_name || "",
+    reality_handshake_server: initialConfig.tls?.reality?.handshake?.server || "",
+    reality_handshake_port: initialConfig.tls?.reality?.handshake?.server_port || 443,
+    reality_private_key: initialConfig.tls?.reality?.private_key || "",
+    reality_short_id: initialConfig.tls?.reality?.short_id?.[0] || "",
+    transport_type: initialConfig.transport?.type || "tcp",
+    transport_path: initialConfig.transport?.path || "",
+    transport_service_name: initialConfig.transport?.service_name || "",
+    multiplex_enabled: initialConfig.multiplex?.enabled || false,
+    multiplex_padding: initialConfig.multiplex?.padding || false,
+    multiplex_brutal: initialConfig.multiplex?.brutal?.enabled || false,
+    multiplex_brutal_up: initialConfig.multiplex?.brutal?.up_mbps || 0,
+    multiplex_brutal_down: initialConfig.multiplex?.brutal?.down_mbps || 0,
+    tls_alpn: (initialConfig.tls?.alpn || []).join(", "),
+    transport_host: Array.isArray(initialConfig.transport?.host) ? initialConfig.transport.host.join(", ") : initialConfig.transport?.host || "",
+    ws_max_early_data: initialConfig.transport?.max_early_data || 0,
+    ws_early_data_header_name: initialConfig.transport?.early_data_header_name || "",
+  }
+}
+
+function buildVlessInbound(flat: VlessFlat, realityPublicKey: string): any {
+  const vlessUsers = flat.users
+    .filter((u) => u.uuid)
+    .map((u) => {
+      const user: any = { uuid: u.uuid }
+      if (u.name) user.name = u.name
+      if (u.flow) user.flow = u.flow
+      return user
+    })
+
+  const previewConfig: any = {
+    type: "vless",
+    tag: "vless-in",
+    listen: formatListen(flat.listen),
+    listen_port: flat.listen_port,
+    users: vlessUsers,
+  }
+
+  const alpnArr = flat.tls_alpn ? flat.tls_alpn.split(",").map(s => s.trim()).filter(Boolean) : []
+
+  if (flat.tls_enabled) {
+    if (flat.tls_mode === "reality") {
+      previewConfig.tls = {
+        enabled: true,
+        server_name: flat.tls_server_name || flat.reality_handshake_server,
+        reality: {
+          enabled: true,
+          handshake: {
+            server: flat.reality_handshake_server,
+            server_port: flat.reality_handshake_port,
+          },
+          private_key: flat.reality_private_key,
+          short_id: flat.reality_short_id ? [flat.reality_short_id] : [""],
+          max_time_difference: "1m",
+        },
+      }
+    } else if (flat.tls_mode === "acme" && flat.tls_acme_domain) {
+      previewConfig.tls = {
+        enabled: true,
+        acme: {
+          domain: [flat.tls_acme_domain],
+          data_directory: "/var/lib/sing-box/acme",
+        },
+      }
+    } else {
+      previewConfig.tls = {
+        enabled: true,
+        certificate_path: flat.tls_certificate_path,
+        key_path: flat.tls_key_path,
+      }
+    }
+    if (flat.tls_server_name && flat.tls_mode !== "reality") {
+      previewConfig.tls.server_name = flat.tls_server_name
+    }
+    if (alpnArr.length > 0) {
+      previewConfig.tls.alpn = alpnArr
+    }
+  }
+
+  if (flat.transport_type && flat.transport_type !== "tcp") {
+    previewConfig.transport = {
+      type: flat.transport_type,
+    }
+    if (flat.transport_path) {
+      previewConfig.transport.path = flat.transport_path
+    }
+    if (flat.transport_type === "grpc" && flat.transport_service_name) {
+      previewConfig.transport.service_name = flat.transport_service_name
+    }
+    if (flat.transport_type === "http" && flat.transport_host) {
+      previewConfig.transport.host = flat.transport_host.split(",").map((s: string) => s.trim()).filter(Boolean)
+    }
+    if (flat.transport_type === "httpupgrade" && flat.transport_host) {
+      previewConfig.transport.host = flat.transport_host
+    }
+    if (flat.transport_type === "ws") {
+      if (flat.ws_max_early_data > 0) {
+        previewConfig.transport.max_early_data = flat.ws_max_early_data
+      }
+      if (flat.ws_early_data_header_name) {
+        previewConfig.transport.early_data_header_name = flat.ws_early_data_header_name
+      }
+    }
+  }
+
+  if (flat.multiplex_enabled) {
+    previewConfig.multiplex = { enabled: true, padding: flat.multiplex_padding } as any
+    if (flat.multiplex_brutal) {
+      previewConfig.multiplex.brutal = {
+        enabled: true,
+        up_mbps: flat.multiplex_brutal_up,
+        down_mbps: flat.multiplex_brutal_down,
+      }
+    }
+  }
+
+  return previewConfig
+}
 
 export function VlessForm({
   initialConfig,
@@ -27,208 +222,32 @@ export function VlessForm({
 }: ProtocolFormProps) {
   const { t } = useTranslation("inbound")
   const { t: tc } = useTranslation("common")
-  const isInitializedRef = useRef(false)
 
-  const [vlessConfig, setVlessConfig] = useState({
-    listen: "0.0.0.0",
-    listen_port: 443,
-    users: [{ uuid: "", name: "", flow: "" }] as VLESSUser[],
-    tls_enabled: false,
-    tls_mode: "manual" as "manual" | "acme" | "reality",
-    tls_acme_domain: "",
-    tls_certificate_path: "/etc/sing-box/cert.pem",
-    tls_key_path: "/etc/sing-box/key.pem",
-    tls_server_name: "",
-    reality_handshake_server: "",
-    reality_handshake_port: 443,
-    reality_private_key: "",
-    reality_public_key: "",
-    reality_short_id: "",
-    transport_type: "tcp" as string,
-    transport_path: "",
-    transport_service_name: "",
-    multiplex_enabled: false,
-    multiplex_padding: false,
-    multiplex_brutal: false,
-    multiplex_brutal_up: 0,
-    multiplex_brutal_down: 0,
-    tls_alpn: "",
-    transport_host: "",
-    ws_max_early_data: 0,
-    ws_early_data_header_name: "",
-  })
+  const flat = deriveFlat(initialConfig)
 
+  const [realityPublicKey, setRealityPublicKey] = useState("")
   const [copySuccess, setCopySuccess] = useState(false)
-
   const [tlsCheckState, setTlsCheckState] = useState<{
     loading: boolean
     result?: { supported: boolean; tls_version: string; error?: string }
   }>({ loading: false })
 
-  // Loading useEffect
   useEffect(() => {
-    if (isInitializedRef.current) return
-    if (!initialConfig || initialConfig.type !== "vless") {
-      isInitializedRef.current = true
-      return
-    }
+    if (!flat.reality_private_key) { setRealityPublicKey(""); return }
+    apiClient.deriveRealityPublicKey(flat.reality_private_key)
+      .then(res => setRealityPublicKey(res.public_key))
+      .catch(() => setRealityPublicKey(""))
+  }, [flat.reality_private_key])
 
-    const vlessUsers = (initialConfig.users || []).map((u: any) => ({
-      uuid: u.uuid || "",
-      name: u.name || "",
-      flow: u.flow || "",
-    }))
-    setVlessConfig({
-      listen: parseListen(initialConfig.listen),
-      listen_port: initialConfig.listen_port || 443,
-      users: vlessUsers.length > 0 ? vlessUsers : [{ uuid: "", name: "", flow: "" }],
-      tls_enabled: initialConfig.tls?.enabled || false,
-      tls_mode: initialConfig.tls?.reality?.enabled
-        ? "reality"
-        : (initialConfig.tls?.acme?.domain?.length ?? 0) > 0
-        ? "acme"
-        : "manual",
-      tls_acme_domain: initialConfig.tls?.acme?.domain?.[0] || "",
-      tls_certificate_path: initialConfig.tls?.certificate_path || "/etc/sing-box/cert.pem",
-      tls_key_path: initialConfig.tls?.key_path || "/etc/sing-box/key.pem",
-      tls_server_name: initialConfig.tls?.server_name || "",
-      reality_handshake_server: initialConfig.tls?.reality?.handshake?.server || "",
-      reality_handshake_port: initialConfig.tls?.reality?.handshake?.server_port || 443,
-      reality_private_key: initialConfig.tls?.reality?.private_key || "",
-      reality_public_key: "",
-      reality_short_id: initialConfig.tls?.reality?.short_id?.[0] || "",
-      transport_type: initialConfig.transport?.type || "tcp",
-      transport_path: initialConfig.transport?.path || "",
-      transport_service_name: initialConfig.transport?.service_name || "",
-      multiplex_enabled: initialConfig.multiplex?.enabled || false,
-      multiplex_padding: initialConfig.multiplex?.padding || false,
-      multiplex_brutal: initialConfig.multiplex?.brutal?.enabled || false,
-      multiplex_brutal_up: initialConfig.multiplex?.brutal?.up_mbps || 0,
-      multiplex_brutal_down: initialConfig.multiplex?.brutal?.down_mbps || 0,
-      tls_alpn: (initialConfig.tls?.alpn || []).join(", "),
-      transport_host: Array.isArray(initialConfig.transport?.host) ? initialConfig.transport.host.join(", ") : initialConfig.transport?.host || "",
-      ws_max_early_data: initialConfig.transport?.max_early_data || 0,
-      ws_early_data_header_name: initialConfig.transport?.early_data_header_name || "",
-    })
-
-    if (initialConfig.tls?.reality?.private_key) {
-      apiClient
-        .deriveRealityPublicKey(initialConfig.tls.reality.private_key)
-        .then((res) => {
-          setVlessConfig((prev) => ({ ...prev, reality_public_key: res.public_key }))
-        })
-        .catch(() => console.warn("Failed to derive Reality public key from private key"))
-    }
-
-    isInitializedRef.current = true
-  }, [initialConfig])
-
-  // Building useEffect
-  useEffect(() => {
-    if (!isInitializedRef.current) return
-
-    const vlessUsers = vlessConfig.users
-      .filter((u) => u.uuid)
-      .map((u) => {
-        const user: any = { uuid: u.uuid }
-        if (u.name) user.name = u.name
-        if (u.flow) user.flow = u.flow
-        return user
-      })
-
-    const previewConfig: any = {
-      type: "vless",
-      tag: "vless-in",
-      listen: formatListen(vlessConfig.listen),
-      listen_port: vlessConfig.listen_port,
-      users: vlessUsers,
-    }
-
-    const alpnArr = vlessConfig.tls_alpn ? vlessConfig.tls_alpn.split(",").map(s => s.trim()).filter(Boolean) : []
-
-    if (vlessConfig.tls_enabled) {
-      if (vlessConfig.tls_mode === "reality") {
-        previewConfig.tls = {
-          enabled: true,
-          server_name: vlessConfig.tls_server_name || vlessConfig.reality_handshake_server,
-          reality: {
-            enabled: true,
-            handshake: {
-              server: vlessConfig.reality_handshake_server,
-              server_port: vlessConfig.reality_handshake_port,
-            },
-            private_key: vlessConfig.reality_private_key,
-            short_id: vlessConfig.reality_short_id ? [vlessConfig.reality_short_id] : [""],
-            max_time_difference: "1m",
-          },
-        }
-      } else if (vlessConfig.tls_mode === "acme" && vlessConfig.tls_acme_domain) {
-        previewConfig.tls = {
-          enabled: true,
-          acme: {
-            domain: [vlessConfig.tls_acme_domain],
-            data_directory: "/var/lib/sing-box/acme",
-          },
-        }
-      } else {
-        previewConfig.tls = {
-          enabled: true,
-          certificate_path: vlessConfig.tls_certificate_path,
-          key_path: vlessConfig.tls_key_path,
-        }
-      }
-      if (vlessConfig.tls_server_name && vlessConfig.tls_mode !== "reality") {
-        previewConfig.tls.server_name = vlessConfig.tls_server_name
-      }
-      if (alpnArr.length > 0) {
-        previewConfig.tls.alpn = alpnArr
-      }
-    }
-
-    if (vlessConfig.transport_type && vlessConfig.transport_type !== "tcp") {
-      previewConfig.transport = {
-        type: vlessConfig.transport_type,
-      }
-      if (vlessConfig.transport_path) {
-        previewConfig.transport.path = vlessConfig.transport_path
-      }
-      if (vlessConfig.transport_type === "grpc" && vlessConfig.transport_service_name) {
-        previewConfig.transport.service_name = vlessConfig.transport_service_name
-      }
-      if (vlessConfig.transport_type === "http" && vlessConfig.transport_host) {
-        previewConfig.transport.host = vlessConfig.transport_host.split(",").map((s: string) => s.trim()).filter(Boolean)
-      }
-      if (vlessConfig.transport_type === "httpupgrade" && vlessConfig.transport_host) {
-        previewConfig.transport.host = vlessConfig.transport_host
-      }
-      if (vlessConfig.transport_type === "ws") {
-        if (vlessConfig.ws_max_early_data > 0) {
-          previewConfig.transport.max_early_data = vlessConfig.ws_max_early_data
-        }
-        if (vlessConfig.ws_early_data_header_name) {
-          previewConfig.transport.early_data_header_name = vlessConfig.ws_early_data_header_name
-        }
-      }
-    }
-
-    if (vlessConfig.multiplex_enabled) {
-      previewConfig.multiplex = { enabled: true, padding: vlessConfig.multiplex_padding } as any
-      if (vlessConfig.multiplex_brutal) {
-        previewConfig.multiplex.brutal = {
-          enabled: true,
-          up_mbps: vlessConfig.multiplex_brutal_up,
-          down_mbps: vlessConfig.multiplex_brutal_down,
-        }
-      }
-    }
-
+  function updateInbound(patch: Partial<VlessFlat>) {
+    const newFlat = { ...flat, ...patch }
     clearEndpoints()
-    setInbound(0, previewConfig)
-  }, [vlessConfig, setInbound, clearEndpoints])
+    setInbound(0, buildVlessInbound(newFlat, realityPublicKey))
+  }
 
   const showVlessQrCode = async (userIndex: number) => {
     try {
-      const user = vlessConfig.users[userIndex]
+      const user = flat.users[userIndex]
       if (!user || !user.uuid) {
         throw new Error(t("setUuidFirst"))
       }
@@ -237,28 +256,28 @@ export function VlessForm({
 
       const params = new URLSearchParams()
       params.set("encryption", "none")
-      params.set("type", vlessConfig.transport_type === "tcp" ? "tcp" : vlessConfig.transport_type)
-      if (user.flow && vlessConfig.transport_type === "tcp") params.set("flow", user.flow)
-      if (vlessConfig.transport_type === "ws" && vlessConfig.transport_path) params.set("path", vlessConfig.transport_path)
-      if (vlessConfig.transport_type === "grpc" && vlessConfig.transport_service_name) params.set("serviceName", vlessConfig.transport_service_name)
-      if (vlessConfig.transport_type === "http" && vlessConfig.transport_path) params.set("path", vlessConfig.transport_path)
-      if (vlessConfig.transport_type === "httpupgrade" && vlessConfig.transport_path) params.set("path", vlessConfig.transport_path)
+      params.set("type", flat.transport_type === "tcp" ? "tcp" : flat.transport_type)
+      if (user.flow && flat.transport_type === "tcp") params.set("flow", user.flow)
+      if (flat.transport_type === "ws" && flat.transport_path) params.set("path", flat.transport_path)
+      if (flat.transport_type === "grpc" && flat.transport_service_name) params.set("serviceName", flat.transport_service_name)
+      if (flat.transport_type === "http" && flat.transport_path) params.set("path", flat.transport_path)
+      if (flat.transport_type === "httpupgrade" && flat.transport_path) params.set("path", flat.transport_path)
 
-      if (vlessConfig.tls_enabled) {
-        if (vlessConfig.tls_mode === "reality") {
+      if (flat.tls_enabled) {
+        if (flat.tls_mode === "reality") {
           params.set("security", "reality")
-          if (vlessConfig.tls_server_name) params.set("sni", vlessConfig.tls_server_name)
-          if (vlessConfig.reality_short_id) params.set("sid", vlessConfig.reality_short_id)
-          if (vlessConfig.reality_public_key) params.set("pbk", vlessConfig.reality_public_key)
+          if (flat.tls_server_name) params.set("sni", flat.tls_server_name)
+          if (flat.reality_short_id) params.set("sid", flat.reality_short_id)
+          if (realityPublicKey) params.set("pbk", realityPublicKey)
           params.set("fp", "chrome")
         } else {
           params.set("security", "tls")
-          if (vlessConfig.tls_server_name) params.set("sni", vlessConfig.tls_server_name)
+          if (flat.tls_server_name) params.set("sni", flat.tls_server_name)
         }
       }
 
       const name = user.name || `VLESS-${userIndex + 1}`
-      const vlessUrl = `vless://${user.uuid}@${ip}:${vlessConfig.listen_port}?${params.toString()}#${encodeURIComponent(name)}`
+      const vlessUrl = `vless://${user.uuid}@${ip}:${flat.listen_port}?${params.toString()}#${encodeURIComponent(name)}`
 
       onShowQrCode(vlessUrl, "vless", userIndex)
     } catch (err) {
@@ -273,11 +292,11 @@ export function VlessForm({
         <div className="space-y-2">
           <Label>{t("listenAddr")}</Label>
           <Input
-            value={vlessConfig.listen}
-            onChange={(e) => setVlessConfig({ ...vlessConfig, listen: e.target.value })}
-            className={!isValidListenAddress(vlessConfig.listen) ? "border-red-500" : ""}
+            value={flat.listen}
+            onChange={(e) => updateInbound({ listen: e.target.value })}
+            className={!isValidListenAddress(flat.listen) ? "border-red-500" : ""}
           />
-          {!isValidListenAddress(vlessConfig.listen) && (
+          {!isValidListenAddress(flat.listen) && (
             <p className="text-xs text-red-500">{t("invalidIpAddr")}</p>
           )}
         </div>
@@ -287,14 +306,14 @@ export function VlessForm({
             type="number"
             min="1"
             max="65535"
-            value={vlessConfig.listen_port}
+            value={flat.listen_port}
             onChange={(e) => {
-              const port = parsePort(e.target.value, vlessConfig.listen_port)
-              setVlessConfig({ ...vlessConfig, listen_port: port })
+              const port = parsePort(e.target.value, flat.listen_port)
+              updateInbound({ listen_port: port })
             }}
-            className={!isValidPort(vlessConfig.listen_port) ? "border-red-500" : ""}
+            className={!isValidPort(flat.listen_port) ? "border-red-500" : ""}
           />
-          {!isValidPort(vlessConfig.listen_port) && (
+          {!isValidPort(flat.listen_port) && (
             <p className="text-xs text-red-500">{t("portRange")}</p>
           )}
         </div>
@@ -310,9 +329,8 @@ export function VlessForm({
           <Button
             size="sm"
             onClick={() =>
-              setVlessConfig({
-                ...vlessConfig,
-                users: [...vlessConfig.users, { uuid: "", name: "", flow: "" }],
+              updateInbound({
+                users: [...flat.users, { uuid: "", name: "", flow: "" }],
               })
             }
           >
@@ -322,7 +340,7 @@ export function VlessForm({
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
-          {vlessConfig.users.map((user, index) => (
+          {flat.users.map((user, index) => (
             <div key={index} className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative group hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300">
               <div className="space-y-4">
                 <div className="flex justify-between items-center mb-1">
@@ -342,15 +360,14 @@ export function VlessForm({
                     >
                       <QrCode className="h-4 w-4" />
                     </Button>
-                    {vlessConfig.users.length > 1 && (
+                    {flat.users.length > 1 && (
                       <Button
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8 text-zinc-400 hover:text-destructive hover:bg-destructive/5 rounded-full"
                         onClick={() =>
-                          setVlessConfig({
-                            ...vlessConfig,
-                            users: vlessConfig.users.filter((_, i) => i !== index),
+                          updateInbound({
+                            users: flat.users.filter((_, i) => i !== index),
                           })
                         }
                       >
@@ -359,7 +376,7 @@ export function VlessForm({
                     )}
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold ml-1">{t("configuration")}</Label>
                   <div className="space-y-3 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
@@ -370,9 +387,8 @@ export function VlessForm({
                           placeholder="e.g. 12345678-1234..."
                           value={user.uuid}
                           onChange={(e) => {
-                            const newUsers = [...vlessConfig.users]
-                            newUsers[index].uuid = e.target.value
-                            setVlessConfig({ ...vlessConfig, users: newUsers })
+                            const users = flat.users.map((u, i) => i === index ? { ...u, uuid: e.target.value } : u)
+                            updateInbound({ users })
                           }}
                           className="flex-1 h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm font-mono focus-visible:ring-primary/20"
                         />
@@ -382,16 +398,15 @@ export function VlessForm({
                           size="icon"
                           className="h-9 w-9 shrink-0 border-zinc-200 dark:border-zinc-800"
                           onClick={() => {
-                            const newUsers = [...vlessConfig.users]
-                            newUsers[index].uuid = crypto.randomUUID()
-                            setVlessConfig({ ...vlessConfig, users: newUsers })
+                            const users = flat.users.map((u, i) => i === index ? { ...u, uuid: crypto.randomUUID() } : u)
+                            updateInbound({ users })
                           }}
                         >
                           <Key className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <Label className="text-xs text-zinc-500">{t("nameOptional")}</Label>
@@ -399,9 +414,8 @@ export function VlessForm({
                           placeholder="Remarks"
                           value={user.name || ""}
                           onChange={(e) => {
-                            const newUsers = [...vlessConfig.users]
-                            newUsers[index].name = e.target.value
-                            setVlessConfig({ ...vlessConfig, users: newUsers })
+                            const users = flat.users.map((u, i) => i === index ? { ...u, name: e.target.value } : u)
+                            updateInbound({ users })
                           }}
                           className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus-visible:ring-primary/20"
                         />
@@ -411,13 +425,12 @@ export function VlessForm({
                         <Select
                           value={user.flow || "none"}
                           onValueChange={(val) => {
-                            const newUsers = [...vlessConfig.users]
-                            newUsers[index].flow = val === "none" ? "" : val
-                            const updates: Record<string, unknown> = { users: newUsers }
-                            if (val === "xtls-rprx-vision" && !vlessConfig.tls_enabled) {
+                            const users = flat.users.map((u, i) => i === index ? { ...u, flow: val === "none" ? "" : val } : u)
+                            const updates: Partial<VlessFlat> = { users }
+                            if (val === "xtls-rprx-vision" && !flat.tls_enabled) {
                               updates.tls_enabled = true
                             }
-                            setVlessConfig({ ...vlessConfig, ...updates })
+                            updateInbound(updates)
                           }}
                         >
                           <SelectTrigger className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus:ring-primary/20">
@@ -425,14 +438,14 @@ export function VlessForm({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">{t("noneDefault")}</SelectItem>
-                            <SelectItem value="xtls-rprx-vision" disabled={vlessConfig.transport_type !== "tcp"}>{t("xtlsRecommended")}</SelectItem>
+                            <SelectItem value="xtls-rprx-vision" disabled={flat.transport_type !== "tcp"}>{t("xtlsRecommended")}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
                   </div>
                 </div>
-                {user.flow === "xtls-rprx-vision" && !vlessConfig.tls_enabled && (
+                {user.flow === "xtls-rprx-vision" && !flat.tls_enabled && (
                   <p className="text-xs text-amber-600">{t("xtlsRequiresTls")}</p>
                 )}
               </div>
@@ -456,21 +469,21 @@ export function VlessForm({
               <input
                 type="checkbox"
                 id="vless-tls-enabled"
-                checked={vlessConfig.tls_enabled}
-                onChange={(e) => setVlessConfig({ ...vlessConfig, tls_enabled: e.target.checked })}
+                checked={flat.tls_enabled}
+                onChange={(e) => updateInbound({ tls_enabled: e.target.checked })}
                 className="h-4 w-4 rounded border-zinc-300 text-primary focus:ring-primary"
               />
             </div>
           </div>
 
-          {vlessConfig.tls_enabled && (
+          {flat.tls_enabled && (
             <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
               <div className="space-y-1.5 ml-1">
                 <Label className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Security Mode</Label>
                 <div className="flex flex-wrap gap-2 items-center">
                   <Select
-                    value={vlessConfig.tls_mode}
-                    onValueChange={(val) => setVlessConfig({ ...vlessConfig, tls_mode: val as "manual" | "acme" | "reality" })}
+                    value={flat.tls_mode}
+                    onValueChange={(val) => updateInbound({ tls_mode: val as "manual" | "acme" | "reality" })}
                   >
                     <SelectTrigger className="w-[140px] h-9 bg-zinc-50/80 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800">
                       <SelectValue placeholder="Mode" />
@@ -482,9 +495,9 @@ export function VlessForm({
                     </SelectContent>
                   </Select>
 
-                  {vlessConfig.tls_mode === "manual" && (
+                  {flat.tls_mode === "manual" && (
                     <div className="flex gap-2">
-                      <Button type="button" variant="outline" size="sm" onClick={() => onGenerateCert(vlessConfig.tls_server_name || undefined)} disabled={certLoading} className="h-9 rounded-lg border-zinc-200 dark:border-zinc-800">
+                      <Button type="button" variant="outline" size="sm" onClick={() => onGenerateCert(flat.tls_server_name || undefined)} disabled={certLoading} className="h-9 rounded-lg border-zinc-200 dark:border-zinc-800">
                         <Shield className="h-4 w-4 mr-1.5 text-blue-500" />
                         {certLoading ? t("generating") : t("generateSelfSignedCert")}
                       </Button>
@@ -495,28 +508,28 @@ export function VlessForm({
                     </div>
                   )}
                 </div>
-                {certInfo && vlessConfig.tls_mode === "manual" && (
+                {certInfo && flat.tls_mode === "manual" && (
                   <p className="text-[10px] text-emerald-600 font-medium mt-1 ml-1 bg-emerald-50 dark:bg-emerald-500/10 p-2 rounded-lg border border-emerald-100 dark:border-emerald-500/20">
                     {t("certGenerated", { name: certInfo.common_name ?? "", validTo: certInfo.valid_to ?? "" })}
                   </p>
                 )}
               </div>
 
-              {vlessConfig.tls_mode === "reality" ? (
+              {flat.tls_mode === "reality" ? (
                 <div className="space-y-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-zinc-500">{t("realityHandshakeServer")}</Label>
                       <div className="flex gap-1.5">
                         <Input
-                          value={vlessConfig.reality_handshake_server}
+                          value={flat.reality_handshake_server}
                           onChange={(e) => {
                             const server = e.target.value
-                            const updates: any = { reality_handshake_server: server }
-                            if (!vlessConfig.tls_server_name || vlessConfig.tls_server_name === vlessConfig.reality_handshake_server) {
+                            const updates: Partial<VlessFlat> = { reality_handshake_server: server }
+                            if (!flat.tls_server_name || flat.tls_server_name === flat.reality_handshake_server) {
                               updates.tls_server_name = server
                             }
-                            setVlessConfig({ ...vlessConfig, ...updates })
+                            updateInbound(updates)
                             setTlsCheckState({ loading: false })
                           }}
                           placeholder="www.example.com"
@@ -527,11 +540,11 @@ export function VlessForm({
                           variant="outline"
                           size="sm"
                           className="shrink-0 h-8 px-2 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
-                          disabled={!vlessConfig.reality_handshake_server || tlsCheckState.loading}
+                          disabled={!flat.reality_handshake_server || tlsCheckState.loading}
                           onClick={async () => {
                             setTlsCheckState({ loading: true })
                             try {
-                              const res = await apiClient.checkTls13Support(vlessConfig.reality_handshake_server, vlessConfig.reality_handshake_port)
+                              const res = await apiClient.checkTls13Support(flat.reality_handshake_server, flat.reality_handshake_port)
                               setTlsCheckState({ loading: false, result: res })
                             } catch {
                               setTlsCheckState({ loading: false, result: { supported: false, tls_version: "", error: t("tlsCheckFailed") } })
@@ -553,23 +566,23 @@ export function VlessForm({
                         type="number"
                         min="1"
                         max="65535"
-                        value={vlessConfig.reality_handshake_port}
-                        onChange={(e) => setVlessConfig({ ...vlessConfig, reality_handshake_port: parsePort(e.target.value, vlessConfig.reality_handshake_port) })}
+                        value={flat.reality_handshake_port}
+                        onChange={(e) => updateInbound({ reality_handshake_port: parsePort(e.target.value, flat.reality_handshake_port) })}
                         className="h-8 text-sm bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-1.5">
                     <Label className="text-xs text-zinc-500">SNI ({t("serverNameOptional")})</Label>
                     <Input
-                      value={vlessConfig.tls_server_name}
-                      onChange={(e) => setVlessConfig({ ...vlessConfig, tls_server_name: e.target.value })}
-                      placeholder={vlessConfig.reality_handshake_server || "example.com"}
+                      value={flat.tls_server_name}
+                      onChange={(e) => updateInbound({ tls_server_name: e.target.value })}
+                      placeholder={flat.reality_handshake_server || "example.com"}
                       className="h-8 text-sm bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
                     />
                   </div>
-                  
+
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <Label className="text-xs text-zinc-500">{t("realityPrivateKey")}</Label>
@@ -587,12 +600,11 @@ export function VlessForm({
                             const shortId = Array.from(shortIdBytes)
                               .map((b) => b.toString(16).padStart(2, "0"))
                               .join("")
-                            setVlessConfig((prev) => ({
-                              ...prev,
+                            setRealityPublicKey(response.public_key || "")
+                            updateInbound({
                               reality_private_key: response.private_key,
-                              reality_public_key: response.public_key || "",
-                              reality_short_id: prev.reality_short_id || shortId,
-                            }))
+                              reality_short_id: flat.reality_short_id || shortId,
+                            })
                             if (response.public_key) {
                               try {
                                 await navigator.clipboard.writeText(response.public_key)
@@ -612,18 +624,18 @@ export function VlessForm({
                   </div>
                   <div className="flex gap-2 items-center">
                     <Input
-                      value={vlessConfig.reality_private_key}
-                      onChange={(e) => setVlessConfig({ ...vlessConfig, reality_private_key: e.target.value })}
+                      value={flat.reality_private_key}
+                      onChange={(e) => updateInbound({ reality_private_key: e.target.value })}
                       placeholder="Private Key"
                       className="h-8 text-sm flex-1 font-mono bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
                     />
                   </div>
-                  {vlessConfig.reality_public_key && (
+                  {realityPublicKey && (
                     <div className="flex flex-col gap-1.5 pt-2 border-t border-zinc-100 dark:border-zinc-800/50 mt-1">
                       <Label className="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">{t("publicKey")}</Label>
                       <div className="flex gap-2 items-center w-full">
                         <code className="text-[10px] bg-zinc-100 dark:bg-zinc-800 px-2 py-1.5 rounded-lg flex-1 truncate select-all font-mono text-zinc-600 dark:text-zinc-400">
-                          {vlessConfig.reality_public_key}
+                          {realityPublicKey}
                         </code>
                         <Button
                           type="button"
@@ -632,7 +644,7 @@ export function VlessForm({
                           className="h-7 w-7 shrink-0 bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
                           onClick={async () => {
                             try {
-                              await navigator.clipboard.writeText(vlessConfig.reality_public_key)
+                              await navigator.clipboard.writeText(realityPublicKey)
                               setCopySuccess(true)
                               setTimeout(() => setCopySuccess(false), 2000)
                             } catch {
@@ -649,20 +661,20 @@ export function VlessForm({
                 <div className="space-y-1.5">
                   <Label className="text-xs text-zinc-500">{t("realityShortId")}</Label>
                   <Input
-                    value={vlessConfig.reality_short_id}
-                    onChange={(e) => setVlessConfig({ ...vlessConfig, reality_short_id: e.target.value })}
+                    value={flat.reality_short_id}
+                    onChange={(e) => updateInbound({ reality_short_id: e.target.value })}
                     placeholder="0123456789abcdef"
                     className="h-8 text-sm font-mono bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
                   />
                   <p className="text-[10px] text-zinc-400 ml-1">{t("realityShortIdHint")}</p>
                 </div>
               </div>
-            ) : vlessConfig.tls_mode === "acme" ? (
+            ) : flat.tls_mode === "acme" ? (
               <div className="space-y-1.5 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
                 <Label className="text-xs text-zinc-500">{t("acmeDomain")}</Label>
                 <Input
-                  value={vlessConfig.tls_acme_domain}
-                  onChange={(e) => setVlessConfig({ ...vlessConfig, tls_acme_domain: e.target.value })}
+                  value={flat.tls_acme_domain}
+                  onChange={(e) => updateInbound({ tls_acme_domain: e.target.value })}
                   placeholder="example.com"
                   className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                 />
@@ -673,8 +685,8 @@ export function VlessForm({
                 <div className="space-y-1.5">
                   <Label className="text-xs text-zinc-500">{t("serverNameOptional")}</Label>
                   <Input
-                    value={vlessConfig.tls_server_name}
-                    onChange={(e) => setVlessConfig({ ...vlessConfig, tls_server_name: e.target.value })}
+                    value={flat.tls_server_name}
+                    onChange={(e) => updateInbound({ tls_server_name: e.target.value })}
                     placeholder="example.com"
                     className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                   />
@@ -683,8 +695,8 @@ export function VlessForm({
                   <div className="space-y-1.5">
                     <Label className="text-xs text-zinc-500">{t("certPath")}</Label>
                     <Input
-                      value={vlessConfig.tls_certificate_path}
-                      onChange={(e) => setVlessConfig({ ...vlessConfig, tls_certificate_path: e.target.value })}
+                      value={flat.tls_certificate_path}
+                      onChange={(e) => updateInbound({ tls_certificate_path: e.target.value })}
                       placeholder="/etc/sing-box/cert.pem"
                       className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                     />
@@ -692,8 +704,8 @@ export function VlessForm({
                   <div className="space-y-1.5">
                     <Label className="text-xs text-zinc-500">{t("keyPath")}</Label>
                     <Input
-                      value={vlessConfig.tls_key_path}
-                      onChange={(e) => setVlessConfig({ ...vlessConfig, tls_key_path: e.target.value })}
+                      value={flat.tls_key_path}
+                      onChange={(e) => updateInbound({ tls_key_path: e.target.value })}
                       placeholder="/etc/sing-box/key.pem"
                       className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                     />
@@ -704,8 +716,8 @@ export function VlessForm({
             <div className="space-y-1.5 pt-2 ml-1">
               <Label className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">{t("alpnProtocol")}</Label>
               <Input
-                value={vlessConfig.tls_alpn}
-                onChange={(e) => setVlessConfig({ ...vlessConfig, tls_alpn: e.target.value })}
+                value={flat.tls_alpn}
+                onChange={(e) => updateInbound({ tls_alpn: e.target.value })}
                 placeholder="h2, http/1.1"
                 className="h-9 bg-zinc-50/80 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 text-sm"
               />
@@ -732,13 +744,13 @@ export function VlessForm({
               <div className="space-y-1.5 ml-1">
                 <Label className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">{t("transportProtocol")}</Label>
                 <Select
-                  value={vlessConfig.transport_type}
+                  value={flat.transport_type}
                   onValueChange={(val) => {
-                    const updates: any = { transport_type: val }
+                    const updates: Partial<VlessFlat> = { transport_type: val }
                     if (val !== "tcp") {
-                      updates.users = vlessConfig.users.map((u) => (u.flow ? { ...u, flow: "" } : u))
+                      updates.users = flat.users.map((u) => (u.flow ? { ...u, flow: "" } : u))
                     }
-                    setVlessConfig({ ...vlessConfig, ...updates })
+                    updateInbound(updates)
                   }}
                 >
                   <SelectTrigger className="h-9 bg-zinc-50/80 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 text-sm">
@@ -754,14 +766,14 @@ export function VlessForm({
                 </Select>
               </div>
 
-              {vlessConfig.transport_type !== "tcp" && (
+              {flat.transport_type !== "tcp" && (
                 <div className="space-y-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50 animate-in fade-in slide-in-from-top-1">
-                  {vlessConfig.transport_type === "grpc" ? (
+                  {flat.transport_type === "grpc" ? (
                     <div className="space-y-1.5">
                       <Label className="text-xs text-zinc-500">Service Name</Label>
                       <Input
-                        value={vlessConfig.transport_service_name}
-                        onChange={(e) => setVlessConfig({ ...vlessConfig, transport_service_name: e.target.value })}
+                        value={flat.transport_service_name}
+                        onChange={(e) => updateInbound({ transport_service_name: e.target.value })}
                         placeholder="grpc-service"
                         className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                       />
@@ -770,32 +782,32 @@ export function VlessForm({
                     <div className="space-y-1.5">
                       <Label className="text-xs text-zinc-500">Path</Label>
                       <Input
-                        value={vlessConfig.transport_path}
-                        onChange={(e) => setVlessConfig({ ...vlessConfig, transport_path: e.target.value })}
+                        value={flat.transport_path}
+                        onChange={(e) => updateInbound({ transport_path: e.target.value })}
                         placeholder="/ws-path"
                         className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                       />
                     </div>
                   )}
-                  {(vlessConfig.transport_type === "http" || vlessConfig.transport_type === "httpupgrade") && (
+                  {(flat.transport_type === "http" || flat.transport_type === "httpupgrade") && (
                     <div className="space-y-1.5">
                       <Label className="text-xs text-zinc-500">{t("host")}</Label>
                       <Input
-                        value={vlessConfig.transport_host}
-                        onChange={(e) => setVlessConfig({ ...vlessConfig, transport_host: e.target.value })}
+                        value={flat.transport_host}
+                        onChange={(e) => updateInbound({ transport_host: e.target.value })}
                         placeholder="example.com"
                         className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                       />
                     </div>
                   )}
-                  {vlessConfig.transport_type === "ws" && (
+                  {flat.transport_type === "ws" && (
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <Label className="text-xs text-zinc-500">{t("maxEarlyData")}</Label>
                         <Input
                           type="number"
-                          value={vlessConfig.ws_max_early_data}
-                          onChange={(e) => setVlessConfig({ ...vlessConfig, ws_max_early_data: parseInt(e.target.value) || 0 })}
+                          value={flat.ws_max_early_data}
+                          onChange={(e) => updateInbound({ ws_max_early_data: parseInt(e.target.value) || 0 })}
                           placeholder="2048"
                           className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                         />
@@ -803,8 +815,8 @@ export function VlessForm({
                       <div className="space-y-1.5">
                         <Label className="text-xs text-zinc-500">{t("earlyDataHeader")}</Label>
                         <Input
-                          value={vlessConfig.ws_early_data_header_name}
-                          onChange={(e) => setVlessConfig({ ...vlessConfig, ws_early_data_header_name: e.target.value })}
+                          value={flat.ws_early_data_header_name}
+                          onChange={(e) => updateInbound({ ws_early_data_header_name: e.target.value })}
                           placeholder="Sec-WebSocket-Protocol"
                           className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                         />
@@ -829,22 +841,22 @@ export function VlessForm({
                 <input
                   type="checkbox"
                   id="vless-multiplex"
-                  checked={vlessConfig.multiplex_enabled}
-                  onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_enabled: e.target.checked })}
+                  checked={flat.multiplex_enabled}
+                  onChange={(e) => updateInbound({ multiplex_enabled: e.target.checked })}
                   className="h-4 w-4 rounded border-zinc-300 text-primary focus:ring-primary"
                 />
               </div>
             </div>
 
-            {vlessConfig.multiplex_enabled && (
+            {flat.multiplex_enabled && (
               <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
                 <div className="flex flex-wrap gap-4 ml-1">
                   <div className="flex items-center space-x-2">
                     <input
                       type="checkbox"
                       id="vless-multiplex-padding"
-                      checked={vlessConfig.multiplex_padding}
-                      onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_padding: e.target.checked })}
+                      checked={flat.multiplex_padding}
+                      onChange={(e) => updateInbound({ multiplex_padding: e.target.checked })}
                       className="h-4 w-4 rounded border-zinc-300 text-primary"
                     />
                     <Label htmlFor="vless-multiplex-padding" className="text-sm font-medium text-zinc-600 dark:text-zinc-400">{t("multiplexPadding")}</Label>
@@ -853,22 +865,22 @@ export function VlessForm({
                     <input
                       type="checkbox"
                       id="vless-multiplex-brutal"
-                      checked={vlessConfig.multiplex_brutal}
-                      onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_brutal: e.target.checked })}
+                      checked={flat.multiplex_brutal}
+                      onChange={(e) => updateInbound({ multiplex_brutal: e.target.checked })}
                       className="h-4 w-4 rounded border-zinc-300 text-primary"
                     />
                     <Label htmlFor="vless-multiplex-brutal" className="text-sm font-medium text-zinc-600 dark:text-zinc-400">{t("enableBrutal")}</Label>
                   </div>
                 </div>
 
-                {vlessConfig.multiplex_brutal && (
+                {flat.multiplex_brutal && (
                   <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-zinc-500">{t("upMbps")}</Label>
                       <Input
                         type="number"
-                        value={vlessConfig.multiplex_brutal_up}
-                        onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_brutal_up: parseInt(e.target.value) || 0 })}
+                        value={flat.multiplex_brutal_up}
+                        onChange={(e) => updateInbound({ multiplex_brutal_up: parseInt(e.target.value) || 0 })}
                         className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                       />
                     </div>
@@ -876,8 +888,8 @@ export function VlessForm({
                       <Label className="text-xs text-zinc-500">{t("downMbps")}</Label>
                       <Input
                         type="number"
-                        value={vlessConfig.multiplex_brutal_down}
-                        onChange={(e) => setVlessConfig({ ...vlessConfig, multiplex_brutal_down: parseInt(e.target.value) || 0 })}
+                        value={flat.multiplex_brutal_down}
+                        onChange={(e) => updateInbound({ multiplex_brutal_down: parseInt(e.target.value) || 0 })}
                         className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                       />
                     </div>

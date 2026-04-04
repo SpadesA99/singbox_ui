@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,86 @@ import { Plus, Trash2, Key, QrCode, Shield } from "lucide-react"
 import { isValidPort, parsePort, isValidListenAddress, generateSecureRandomString } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n"
 import { ProtocolFormProps, TUICUser, formatListen, parseListen } from "./types"
+
+interface TuicFlat {
+  listen: string
+  listen_port: number
+  users: TUICUser[]
+  congestion_control: string
+  zero_rtt_handshake: boolean
+  tls_alpn: string[]
+  tls_mode: "manual" | "acme"
+  tls_acme_domain: string
+  tls_certificate_path: string
+  tls_key_path: string
+  auth_timeout: string
+  heartbeat: string
+}
+
+function deriveFlat(initialConfig: any): TuicFlat {
+  const c = initialConfig?.type === "tuic" ? initialConfig : null
+  const tuicUsers = (c?.users || []).map((u: any) => ({
+    uuid: u.uuid || "",
+    name: u.name || "",
+    password: u.password || "",
+  }))
+  return {
+    listen: parseListen(c?.listen),
+    listen_port: c?.listen_port || 443,
+    users: tuicUsers.length > 0 ? tuicUsers : [{ uuid: "", name: "", password: "" }],
+    congestion_control: c?.congestion_control || "cubic",
+    zero_rtt_handshake: c?.zero_rtt_handshake || false,
+    tls_alpn: c?.tls?.alpn || ["h3"],
+    tls_mode: (c?.tls?.acme?.domain?.length ?? 0) > 0 ? "acme" : "manual",
+    tls_acme_domain: c?.tls?.acme?.domain?.[0] || "",
+    tls_certificate_path: c?.tls?.certificate_path || "/etc/sing-box/cert.pem",
+    tls_key_path: c?.tls?.key_path || "/etc/sing-box/key.pem",
+    auth_timeout: c?.auth_timeout || "",
+    heartbeat: c?.heartbeat || "",
+  }
+}
+
+function buildTuicInbound(f: TuicFlat): any {
+  const tuicUsersPreview = f.users
+    .filter((u) => u.uuid)
+    .map((u) => {
+      const user: any = { uuid: u.uuid }
+      if (u.name) user.name = u.name
+      if (u.password) user.password = u.password
+      return user
+    })
+
+  const previewConfig: any = {
+    type: "tuic",
+    tag: "tuic-in",
+    listen: formatListen(f.listen),
+    listen_port: f.listen_port,
+    users: tuicUsersPreview,
+    congestion_control: f.congestion_control,
+    zero_rtt_handshake: f.zero_rtt_handshake,
+    tls: f.tls_mode === "acme" && f.tls_acme_domain ? {
+      enabled: true,
+      alpn: f.tls_alpn,
+      acme: {
+        domain: [f.tls_acme_domain],
+        data_directory: "/var/lib/sing-box/acme",
+      },
+    } : {
+      enabled: true,
+      alpn: f.tls_alpn,
+      certificate_path: f.tls_certificate_path,
+      key_path: f.tls_key_path,
+    },
+  }
+
+  if (f.auth_timeout) {
+    previewConfig.auth_timeout = f.auth_timeout
+  }
+  if (f.heartbeat) {
+    previewConfig.heartbeat = f.heartbeat
+  }
+  return previewConfig
+}
 
 export function TuicForm({
   initialConfig,
@@ -24,102 +104,17 @@ export function TuicForm({
   const { t } = useTranslation("inbound")
   const { t: tc } = useTranslation("common")
 
-  const [tuicConfig, setTuicConfig] = useState({
-    listen: "0.0.0.0",
-    listen_port: 443,
-    users: [{ uuid: "", name: "", password: "" }] as TUICUser[],
-    congestion_control: "cubic" as string,
-    zero_rtt_handshake: false,
-    tls_alpn: ["h3"] as string[],
-    tls_mode: "manual" as "manual" | "acme",
-    tls_acme_domain: "",
-    tls_certificate_path: "/etc/sing-box/cert.pem",
-    tls_key_path: "/etc/sing-box/key.pem",
-    auth_timeout: "",
-    heartbeat: "",
-  })
+  const flat = deriveFlat(initialConfig)
 
-  const [initialized, setInitialized] = useState(false)
-
-  // Load from initialConfig
-  useEffect(() => {
-    if (initialized) return
-    if (!initialConfig || initialConfig.type !== "tuic") {
-      setInitialized(true)
-      return
-    }
-    const tuicUsers = (initialConfig.users || []).map((u: any) => ({
-      uuid: u.uuid || "",
-      name: u.name || "",
-      password: u.password || "",
-    }))
-    setTuicConfig({
-      listen: parseListen(initialConfig.listen),
-      listen_port: initialConfig.listen_port || 443,
-      users: tuicUsers.length > 0 ? tuicUsers : [{ uuid: "", name: "", password: "" }],
-      congestion_control: initialConfig.congestion_control || "cubic",
-      zero_rtt_handshake: initialConfig.zero_rtt_handshake || false,
-      tls_alpn: initialConfig.tls?.alpn || ["h3"],
-      tls_mode: (initialConfig.tls?.acme?.domain?.length ?? 0) > 0 ? "acme" : "manual",
-      tls_acme_domain: initialConfig.tls?.acme?.domain?.[0] || "",
-      tls_certificate_path: initialConfig.tls?.certificate_path || "/etc/sing-box/cert.pem",
-      tls_key_path: initialConfig.tls?.key_path || "/etc/sing-box/key.pem",
-      auth_timeout: initialConfig.auth_timeout || "",
-      heartbeat: initialConfig.heartbeat || "",
-    })
-    setInitialized(true)
-  }, [initialConfig, initialized])
-
-  // Build and sync preview config
-  useEffect(() => {
-    if (!initialized) return
-
-    const tuicUsersPreview = tuicConfig.users
-      .filter((u) => u.uuid)
-      .map((u) => {
-        const user: any = { uuid: u.uuid }
-        if (u.name) user.name = u.name
-        if (u.password) user.password = u.password
-        return user
-      })
-
-    const previewConfig: any = {
-      type: "tuic",
-      tag: "tuic-in",
-      listen: formatListen(tuicConfig.listen),
-      listen_port: tuicConfig.listen_port,
-      users: tuicUsersPreview,
-      congestion_control: tuicConfig.congestion_control,
-      zero_rtt_handshake: tuicConfig.zero_rtt_handshake,
-      tls: tuicConfig.tls_mode === "acme" && tuicConfig.tls_acme_domain ? {
-        enabled: true,
-        alpn: tuicConfig.tls_alpn,
-        acme: {
-          domain: [tuicConfig.tls_acme_domain],
-          data_directory: "/var/lib/sing-box/acme",
-        },
-      } : {
-        enabled: true,
-        alpn: tuicConfig.tls_alpn,
-        certificate_path: tuicConfig.tls_certificate_path,
-        key_path: tuicConfig.tls_key_path,
-      },
-    }
-
-    if (tuicConfig.auth_timeout) {
-      previewConfig.auth_timeout = tuicConfig.auth_timeout
-    }
-    if (tuicConfig.heartbeat) {
-      previewConfig.heartbeat = tuicConfig.heartbeat
-    }
-
+  const updateInbound = useCallback((patch: Partial<TuicFlat>) => {
+    const merged = { ...flat, ...patch }
     clearEndpoints()
-    setInbound(0, previewConfig)
-  }, [tuicConfig, initialized, setInbound, clearEndpoints])
+    setInbound(0, buildTuicInbound(merged))
+  }, [flat, clearEndpoints, setInbound])
 
   const showTuicQrCode = async (userIndex: number) => {
     try {
-      const user = tuicConfig.users[userIndex]
+      const user = flat.users[userIndex]
       if (!user || !user.uuid) {
         throw new Error(t("setUuidFirst"))
       }
@@ -137,14 +132,14 @@ export function TuicForm({
       }
 
       const params = new URLSearchParams()
-      params.set("congestion_control", tuicConfig.congestion_control)
+      params.set("congestion_control", flat.congestion_control)
       params.set("udp_relay_mode", "native")
       params.set("alpn", "h3")
       params.set("allow_insecure", "1")
 
       const name = user.name || `TUIC-${userIndex + 1}`
       const password = user.password || ""
-      const tuicUrl = `tuic://${user.uuid}:${encodeURIComponent(password)}@${ip}:${tuicConfig.listen_port}?${params.toString()}#${encodeURIComponent(name)}`
+      const tuicUrl = `tuic://${user.uuid}:${encodeURIComponent(password)}@${ip}:${flat.listen_port}?${params.toString()}#${encodeURIComponent(name)}`
 
       onShowQrCode(tuicUrl, "tuic", userIndex)
     } catch (err) {
@@ -158,9 +153,9 @@ export function TuicForm({
         <div className="space-y-2">
           <Label>{t("listenAddr")}</Label>
           <Input
-            value={tuicConfig.listen}
-            onChange={(e) => setTuicConfig({ ...tuicConfig, listen: e.target.value })}
-            className={!isValidListenAddress(tuicConfig.listen) ? "border-red-500" : ""}
+            value={flat.listen}
+            onChange={(e) => updateInbound({ listen: e.target.value })}
+            className={!isValidListenAddress(flat.listen) ? "border-red-500" : ""}
           />
         </div>
         <div className="space-y-2">
@@ -169,12 +164,12 @@ export function TuicForm({
             type="number"
             min="1"
             max="65535"
-            value={tuicConfig.listen_port}
+            value={flat.listen_port}
             onChange={(e) => {
-              const port = parsePort(e.target.value, tuicConfig.listen_port)
-              setTuicConfig({ ...tuicConfig, listen_port: port })
+              const port = parsePort(e.target.value, flat.listen_port)
+              updateInbound({ listen_port: port })
             }}
-            className={!isValidPort(tuicConfig.listen_port) ? "border-red-500" : ""}
+            className={!isValidPort(flat.listen_port) ? "border-red-500" : ""}
           />
         </div>
       </div>
@@ -183,8 +178,8 @@ export function TuicForm({
         <Label>{t("congestionAlgorithm")}</Label>
         <select
           className="w-full h-9 px-3 rounded-md border border-input bg-transparent"
-          value={tuicConfig.congestion_control}
-          onChange={(e) => setTuicConfig({ ...tuicConfig, congestion_control: e.target.value })}
+          value={flat.congestion_control}
+          onChange={(e) => updateInbound({ congestion_control: e.target.value })}
         >
           <option value="cubic">{t("cubicDefault")}</option>
           <option value="new_reno">New Reno</option>
@@ -196,8 +191,8 @@ export function TuicForm({
         <input
           type="checkbox"
           id="tuic-zero-rtt"
-          checked={tuicConfig.zero_rtt_handshake}
-          onChange={(e) => setTuicConfig({ ...tuicConfig, zero_rtt_handshake: e.target.checked })}
+          checked={flat.zero_rtt_handshake}
+          onChange={(e) => updateInbound({ zero_rtt_handshake: e.target.checked })}
           className="h-4 w-4"
         />
         <Label htmlFor="tuic-zero-rtt">{t("zeroRttHandshake")}</Label>
@@ -210,10 +205,7 @@ export function TuicForm({
             size="sm"
             variant="outline"
             onClick={() =>
-              setTuicConfig({
-                ...tuicConfig,
-                users: [...tuicConfig.users, { uuid: "", name: "", password: "" }],
-              })
+              updateInbound({ users: [...flat.users, { uuid: "", name: "", password: "" }] })
             }
           >
             <Plus className="h-4 w-4 mr-1" />
@@ -221,7 +213,7 @@ export function TuicForm({
           </Button>
         </div>
 
-        {tuicConfig.users.map((user, index) => (
+        {flat.users.map((user, index) => (
           <Card key={index} className="p-3">
             <div className="space-y-2">
               <div className="flex justify-between items-center">
@@ -235,15 +227,12 @@ export function TuicForm({
                   >
                     <QrCode className="h-4 w-4" />
                   </Button>
-                  {tuicConfig.users.length > 1 && (
+                  {flat.users.length > 1 && (
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() =>
-                        setTuicConfig({
-                          ...tuicConfig,
-                          users: tuicConfig.users.filter((_, i) => i !== index),
-                        })
+                        updateInbound({ users: flat.users.filter((_, i) => i !== index) })
                       }
                     >
                       <Trash2 className="h-4 w-4" />
@@ -256,9 +245,9 @@ export function TuicForm({
                   placeholder="UUID"
                   value={user.uuid}
                   onChange={(e) => {
-                    const newUsers = [...tuicConfig.users]
-                    newUsers[index].uuid = e.target.value
-                    setTuicConfig({ ...tuicConfig, users: newUsers })
+                    const newUsers = [...flat.users]
+                    newUsers[index] = { ...newUsers[index], uuid: e.target.value }
+                    updateInbound({ users: newUsers })
                   }}
                   className="flex-1"
                 />
@@ -267,9 +256,9 @@ export function TuicForm({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const newUsers = [...tuicConfig.users]
-                    newUsers[index].uuid = crypto.randomUUID()
-                    setTuicConfig({ ...tuicConfig, users: newUsers })
+                    const newUsers = [...flat.users]
+                    newUsers[index] = { ...newUsers[index], uuid: crypto.randomUUID() }
+                    updateInbound({ users: newUsers })
                   }}
                 >
                   <Key className="h-4 w-4" />
@@ -279,9 +268,9 @@ export function TuicForm({
                 placeholder={t("nameOptional")}
                 value={user.name || ""}
                 onChange={(e) => {
-                  const newUsers = [...tuicConfig.users]
-                  newUsers[index].name = e.target.value
-                  setTuicConfig({ ...tuicConfig, users: newUsers })
+                  const newUsers = [...flat.users]
+                  newUsers[index] = { ...newUsers[index], name: e.target.value }
+                  updateInbound({ users: newUsers })
                 }}
               />
               <div className="flex gap-2">
@@ -289,9 +278,9 @@ export function TuicForm({
                   placeholder={t("passwordOptional")}
                   value={user.password || ""}
                   onChange={(e) => {
-                    const newUsers = [...tuicConfig.users]
-                    newUsers[index].password = e.target.value
-                    setTuicConfig({ ...tuicConfig, users: newUsers })
+                    const newUsers = [...flat.users]
+                    newUsers[index] = { ...newUsers[index], password: e.target.value }
+                    updateInbound({ users: newUsers })
                   }}
                   className="flex-1"
                 />
@@ -300,9 +289,9 @@ export function TuicForm({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const newUsers = [...tuicConfig.users]
-                    newUsers[index].password = generateSecureRandomString(16)
-                    setTuicConfig({ ...tuicConfig, users: newUsers })
+                    const newUsers = [...flat.users]
+                    newUsers[index] = { ...newUsers[index], password: generateSecureRandomString(16) }
+                    updateInbound({ users: newUsers })
                   }}
                 >
                   <Key className="h-4 w-4" />
@@ -319,14 +308,14 @@ export function TuicForm({
           <Label>{t("tuicTlsLabel")}</Label>
           <div className="flex gap-2 items-center">
             <select
-              value={tuicConfig.tls_mode}
-              onChange={(e) => setTuicConfig({ ...tuicConfig, tls_mode: e.target.value as "manual" | "acme" })}
+              value={flat.tls_mode}
+              onChange={(e) => updateInbound({ tls_mode: e.target.value as "manual" | "acme" })}
               className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
             >
               <option value="manual">{t("manualConfig")}</option>
               <option value="acme">{t("acmeAuto")}</option>
             </select>
-            {tuicConfig.tls_mode === "manual" && (
+            {flat.tls_mode === "manual" && (
               <Button
                 type="button"
                 variant="outline"
@@ -340,12 +329,12 @@ export function TuicForm({
             )}
           </div>
         </div>
-        {tuicConfig.tls_mode === "acme" ? (
+        {flat.tls_mode === "acme" ? (
           <div className="space-y-2">
             <Label>{t("acmeDomain")}</Label>
             <Input
-              value={tuicConfig.tls_acme_domain}
-              onChange={(e) => setTuicConfig({ ...tuicConfig, tls_acme_domain: e.target.value })}
+              value={flat.tls_acme_domain}
+              onChange={(e) => updateInbound({ tls_acme_domain: e.target.value })}
               placeholder="example.com"
             />
             <p className="text-xs text-muted-foreground">{t("acmeHint")}</p>
@@ -355,16 +344,16 @@ export function TuicForm({
             <div className="space-y-2">
               <Label>{t("certPath")}</Label>
               <Input
-                value={tuicConfig.tls_certificate_path}
-                onChange={(e) => setTuicConfig({ ...tuicConfig, tls_certificate_path: e.target.value })}
+                value={flat.tls_certificate_path}
+                onChange={(e) => updateInbound({ tls_certificate_path: e.target.value })}
                 placeholder="/etc/sing-box/cert.pem"
               />
             </div>
             <div className="space-y-2">
               <Label>{t("keyPath")}</Label>
               <Input
-                value={tuicConfig.tls_key_path}
-                onChange={(e) => setTuicConfig({ ...tuicConfig, tls_key_path: e.target.value })}
+                value={flat.tls_key_path}
+                onChange={(e) => updateInbound({ tls_key_path: e.target.value })}
                 placeholder="/etc/sing-box/key.pem"
               />
             </div>
@@ -374,16 +363,16 @@ export function TuicForm({
           <div className="space-y-2">
             <Label>{t("authTimeout")}</Label>
             <Input
-              value={tuicConfig.auth_timeout}
-              onChange={(e) => setTuicConfig({ ...tuicConfig, auth_timeout: e.target.value })}
+              value={flat.auth_timeout}
+              onChange={(e) => updateInbound({ auth_timeout: e.target.value })}
               placeholder="3s"
             />
           </div>
           <div className="space-y-2">
             <Label>{t("heartbeat")}</Label>
             <Input
-              value={tuicConfig.heartbeat}
-              onChange={(e) => setTuicConfig({ ...tuicConfig, heartbeat: e.target.value })}
+              value={flat.heartbeat}
+              onChange={(e) => updateInbound({ heartbeat: e.target.value })}
               placeholder="10s"
             />
           </div>
@@ -391,8 +380,8 @@ export function TuicForm({
         <div className="space-y-2">
           <Label>{t("alpnProtocol")}</Label>
           <Input
-            value={tuicConfig.tls_alpn.join(", ")}
-            onChange={(e) => setTuicConfig({ ...tuicConfig, tls_alpn: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })}
+            value={flat.tls_alpn.join(", ")}
+            onChange={(e) => updateInbound({ tls_alpn: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })}
             placeholder="h3, h3-29"
           />
           <p className="text-xs text-muted-foreground">{t("alpnHint")}</p>

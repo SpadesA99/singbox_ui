@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Plus, Globe } from "lucide-react"
-import { useSingboxConfigStore, DnsServer, DnsRule, DnsConfig } from "@/lib/store/singbox-config"
+import { useSingboxConfigStore, DnsServer, DnsRule } from "@/lib/store/singbox-config"
 import { useTranslation } from "@/lib/i18n"
 import { ServerCard } from "./server-card"
 import { RuleCard } from "./rule-card"
@@ -18,62 +18,28 @@ interface DnsConfigProps {
 export function DnsConfigComponent({ showCard = true }: DnsConfigProps) {
   const { t } = useTranslation("dns")
   const { config, setDns } = useSingboxConfigStore()
-  const initialConfig = config.dns
+  const dns = config.dns || {}
+  const servers: DnsServer[] = dns.servers || []
+  const rules: DnsRule[] = dns.rules || []
+  const finalServer: string = dns.final || ""
+  const independentCache: boolean = dns.independent_cache ?? true
 
-  const [servers, setServers] = useState<DnsServer[]>([])
-  const [rules, setRules] = useState<DnsRule[]>([])
-  const [finalServer, setFinalServer] = useState("")
-  const [independentCache, setIndependentCache] = useState(true)
   const [expandedServers, setExpandedServers] = useState<Set<number>>(new Set())
   const [expandedRules, setExpandedRules] = useState<Set<number>>(new Set())
-
-  const isInitializedRef = useRef(false)
-
-  // Initialize from initialConfig (first load only)
-  useEffect(() => {
-    if (isInitializedRef.current) return
-
-    if (initialConfig) {
-      if (initialConfig.servers) setServers(initialConfig.servers)
-      if (initialConfig.rules) setRules(initialConfig.rules)
-      if (initialConfig.final) setFinalServer(initialConfig.final)
-      if (initialConfig.independent_cache !== undefined) setIndependentCache(initialConfig.independent_cache)
-    }
-    isInitializedRef.current = true
-  }, [initialConfig])
-
-  // Sync to store on every state change
-  useEffect(() => {
-    if (!isInitializedRef.current) return
-
-    const dnsConfig: DnsConfig = {
-      servers: servers.filter(
-        (s) =>
-          s.tag &&
-          (s.type === "local" || s.type === "fakeip" || s.type === "dhcp" || s.type === "hosts" || s.server)
-      ),
-      rules: rules.length > 0 ? rules : undefined,
-      final: finalServer || undefined,
-      independent_cache: independentCache,
-    }
-
-    setDns(dnsConfig)
-  }, [servers, rules, finalServer, independentCache, setDns])
 
   const availableServerTags = servers.filter((s) => s.tag).map((s) => s.tag)
 
   const addServer = () => {
-    setServers([...servers, { tag: `dns_${servers.length + 1}`, server: "", type: "udp" }])
+    setDns({ ...dns, servers: [...servers, { tag: `dns_${servers.length + 1}`, server: "", type: "udp" as const }] })
   }
 
   const removeServer = (index: number) => {
-    setServers(servers.filter((_, i) => i !== index))
+    setDns({ ...dns, servers: servers.filter((_, i) => i !== index) })
   }
 
   const updateServer = (index: number, field: keyof DnsServer, value: any) => {
-    const updated = [...servers]
-    updated[index] = { ...updated[index], [field]: value }
-    setServers(updated)
+    const updated = servers.map((s, i) => (i === index ? { ...s, [field]: value } : s))
+    setDns({ ...dns, servers: updated })
   }
 
   const toggleServerExpanded = (index: number) => {
@@ -84,17 +50,16 @@ export function DnsConfigComponent({ showCard = true }: DnsConfigProps) {
   }
 
   const addRule = () => {
-    setRules([...rules, { action: "route", server: availableServerTags[0] || "" }])
+    setDns({ ...dns, rules: [...rules, { action: "route" as const, server: availableServerTags[0] || "" }] })
   }
 
   const removeRule = (index: number) => {
-    setRules(rules.filter((_, i) => i !== index))
+    setDns({ ...dns, rules: rules.filter((_, i) => i !== index) })
   }
 
   const updateRule = (index: number, field: keyof DnsRule, value: any) => {
-    const updated = [...rules]
-    updated[index] = { ...updated[index], [field]: value }
-    setRules(updated)
+    const updated = rules.map((r, i) => (i === index ? { ...r, [field]: value } : r))
+    setDns({ ...dns, rules: updated })
   }
 
   const updateRuleArray = (
@@ -102,21 +67,23 @@ export function DnsConfigComponent({ showCard = true }: DnsConfigProps) {
     field: "domain" | "domain_suffix" | "rule_set" | "query_type",
     value: string
   ) => {
-    const updated = [...rules]
-    if (field === "query_type") {
-      const nums = value
-        .split(",")
-        .map((v) => parseInt(v.trim(), 10))
-        .filter((v) => !isNaN(v))
-      updated[index] = { ...updated[index], [field]: nums.length > 0 ? nums : undefined }
-    } else {
-      const arr = value
-        .split(",")
-        .map((v) => v.trim())
-        .filter((v) => v)
-      updated[index] = { ...updated[index], [field]: arr.length > 0 ? arr : undefined }
-    }
-    setRules(updated)
+    const updated = rules.map((r, i) => {
+      if (i !== index) return r
+      if (field === "query_type") {
+        const nums = value
+          .split(",")
+          .map((v) => parseInt(v.trim(), 10))
+          .filter((v) => !isNaN(v))
+        return { ...r, [field]: nums.length > 0 ? nums : undefined }
+      } else {
+        const arr = value
+          .split(",")
+          .map((v) => v.trim())
+          .filter((v) => v)
+        return { ...r, [field]: arr.length > 0 ? arr : undefined }
+      }
+    })
+    setDns({ ...dns, rules: updated })
   }
 
   const toggleRuleExpanded = (index: number) => {
@@ -127,10 +94,11 @@ export function DnsConfigComponent({ showCard = true }: DnsConfigProps) {
   }
 
   const handleApplyTemplate = (templateServers: DnsServer[], templateRules: DnsRule[], templateFinal: string) => {
-    setServers(templateServers)
-    setRules(templateRules)
-    setFinalServer(templateFinal)
+    setDns({ ...dns, servers: templateServers, rules: templateRules, final: templateFinal })
   }
+
+  const setFinalServer = (val: string) => setDns({ ...dns, final: val || undefined })
+  const setIndependentCache = (val: boolean) => setDns({ ...dns, independent_cache: val })
 
   const content = (
     <div className="space-y-4">

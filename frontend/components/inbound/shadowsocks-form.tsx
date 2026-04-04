@@ -1,16 +1,15 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Trash2, Key, QrCode, Network, Layers, Shield } from "lucide-react"
+import { Plus, Trash2, Key, QrCode, Network, Layers } from "lucide-react"
 import { isValidPort, parsePort, isValidListenAddress, generateSS2022Key } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n"
 import { ProtocolFormProps, formatListen, parseListen } from "./types"
 
-interface ShadowsocksConfig {
+interface SsFlat {
   listen: string
   listen_port: number
   method: string
@@ -26,6 +25,71 @@ interface ShadowsocksConfig {
 
 const NETWORK_BOTH_VALUE = "__all__"
 
+function deriveFlat(initialConfig: any): SsFlat {
+  if (!initialConfig || initialConfig.type !== "shadowsocks") {
+    return {
+      listen: "0.0.0.0",
+      listen_port: 8388,
+      method: "2022-blake3-chacha20-poly1305",
+      password: "",
+      users: [],
+      multiplex_enabled: false,
+      multiplex_padding: false,
+      multiplex_brutal: false,
+      multiplex_brutal_up: 0,
+      multiplex_brutal_down: 0,
+      network: "",
+    }
+  }
+  return {
+    listen: parseListen(initialConfig.listen),
+    listen_port: initialConfig.listen_port || 8388,
+    method: initialConfig.method || "2022-blake3-chacha20-poly1305",
+    password: initialConfig.password || "",
+    users: (initialConfig.users || []).map((u: any) => ({ name: u.name || "", password: u.password || "" })),
+    multiplex_enabled: initialConfig.multiplex?.enabled || false,
+    multiplex_padding: initialConfig.multiplex?.padding || false,
+    multiplex_brutal: initialConfig.multiplex?.brutal?.enabled || false,
+    multiplex_brutal_up: initialConfig.multiplex?.brutal?.up_mbps || 0,
+    multiplex_brutal_down: initialConfig.multiplex?.brutal?.down_mbps || 0,
+    network: (typeof initialConfig.network === "string" ? initialConfig.network : "") as "" | "tcp" | "udp",
+  }
+}
+
+function buildSsInbound(flat: SsFlat): any {
+  const previewConfig: any = {
+    type: "shadowsocks",
+    tag: "ss-in",
+    listen: formatListen(flat.listen),
+    listen_port: flat.listen_port,
+    method: flat.method,
+    password: flat.password,
+  }
+  if (flat.users.length > 0) {
+    previewConfig.users = flat.users
+      .filter((u) => u.password)
+      .map((u) => {
+        const user: any = { password: u.password }
+        if (u.name) user.name = u.name
+        return user
+      })
+  }
+  if (flat.multiplex_enabled) {
+    previewConfig.multiplex = { enabled: true, padding: flat.multiplex_padding } as any
+    if (flat.multiplex_brutal) {
+      previewConfig.multiplex.brutal = {
+        enabled: true,
+        up_mbps: flat.multiplex_brutal_up,
+        down_mbps: flat.multiplex_brutal_down,
+      }
+    }
+  }
+  if (flat.network) {
+    previewConfig.network = flat.network
+  }
+  return previewConfig
+}
+
 export function ShadowsocksForm({
   initialConfig,
   setInbound,
@@ -37,86 +101,19 @@ export function ShadowsocksForm({
 }: ProtocolFormProps) {
   const { t } = useTranslation("inbound")
   const { t: tc } = useTranslation("common")
-  const isInitializedRef = useRef(false)
 
-  const [ssConfig, setSsConfig] = useState<ShadowsocksConfig>({
-    listen: "0.0.0.0",
-    listen_port: 8388,
-    method: "2022-blake3-chacha20-poly1305",
-    password: "",
-    users: [],
-    multiplex_enabled: false,
-    multiplex_padding: false,
-    multiplex_brutal: false,
-    multiplex_brutal_up: 0,
-    multiplex_brutal_down: 0,
-    network: "",
-  })
+  const flat = deriveFlat(initialConfig)
 
-  // Load from initialConfig
-  useEffect(() => {
-    if (isInitializedRef.current) return
-    if (!initialConfig || initialConfig.type !== "shadowsocks") {
-      isInitializedRef.current = true
-      return
-    }
-    setSsConfig({
-      listen: parseListen(initialConfig.listen),
-      listen_port: initialConfig.listen_port || 8388,
-      method: initialConfig.method || "2022-blake3-chacha20-poly1305",
-      password: initialConfig.password || "",
-      users: (initialConfig.users || []).map((u: any) => ({ name: u.name || "", password: u.password || "" })),
-      multiplex_enabled: initialConfig.multiplex?.enabled || false,
-      multiplex_padding: initialConfig.multiplex?.padding || false,
-      multiplex_brutal: initialConfig.multiplex?.brutal?.enabled || false,
-      multiplex_brutal_up: initialConfig.multiplex?.brutal?.up_mbps || 0,
-      multiplex_brutal_down: initialConfig.multiplex?.brutal?.down_mbps || 0,
-      network: (typeof initialConfig.network === "string" ? initialConfig.network : "") as "" | "tcp" | "udp",
-    })
-    isInitializedRef.current = true
-  }, [initialConfig])
-
-  // Build and push config to store
-  useEffect(() => {
-    if (!isInitializedRef.current) return
-    const previewConfig: any = {
-      type: "shadowsocks",
-      tag: "ss-in",
-      listen: formatListen(ssConfig.listen),
-      listen_port: ssConfig.listen_port,
-      method: ssConfig.method,
-      password: ssConfig.password,
-    }
-    if (ssConfig.users.length > 0) {
-      previewConfig.users = ssConfig.users
-        .filter((u) => u.password)
-        .map((u) => {
-          const user: any = { password: u.password }
-          if (u.name) user.name = u.name
-          return user
-        })
-    }
-    if (ssConfig.multiplex_enabled) {
-      previewConfig.multiplex = { enabled: true, padding: ssConfig.multiplex_padding } as any
-      if (ssConfig.multiplex_brutal) {
-        previewConfig.multiplex.brutal = {
-          enabled: true,
-          up_mbps: ssConfig.multiplex_brutal_up,
-          down_mbps: ssConfig.multiplex_brutal_down,
-        }
-      }
-    }
-    if (ssConfig.network) {
-      previewConfig.network = ssConfig.network
-    }
+  function updateInbound(patch: Partial<SsFlat>) {
+    const newFlat = { ...flat, ...patch }
     clearEndpoints()
-    setInbound(0, previewConfig)
-  }, [ssConfig, setInbound, clearEndpoints])
+    setInbound(0, buildSsInbound(newFlat))
+  }
 
   const showShadowsocksQrCode = async () => {
     onError("")
     try {
-      if (!ssConfig.password) {
+      if (!flat.password) {
         throw new Error(t("setPasswordKeyFirst"))
       }
 
@@ -132,9 +129,9 @@ export function ShadowsocksForm({
         }
       }
 
-      const userInfo = `${ssConfig.method}:${ssConfig.password}`
+      const userInfo = `${flat.method}:${flat.password}`
       const base64UserInfo = btoa(userInfo)
-      const ssUrl = `ss://${base64UserInfo}@${ip}:${ssConfig.listen_port}#Shadowsocks`
+      const ssUrl = `ss://${base64UserInfo}@${ip}:${flat.listen_port}#Shadowsocks`
 
       onShowQrCode(ssUrl, "shadowsocks")
     } catch (err) {
@@ -148,11 +145,11 @@ export function ShadowsocksForm({
         <div className="space-y-2">
           <Label>{t("listenAddr")}</Label>
           <Input
-            value={ssConfig.listen}
-            onChange={(e) => setSsConfig({ ...ssConfig, listen: e.target.value })}
-            className={!isValidListenAddress(ssConfig.listen) ? "border-red-500" : ""}
+            value={flat.listen}
+            onChange={(e) => updateInbound({ listen: e.target.value })}
+            className={!isValidListenAddress(flat.listen) ? "border-red-500" : ""}
           />
-          {!isValidListenAddress(ssConfig.listen) && (
+          {!isValidListenAddress(flat.listen) && (
             <p className="text-xs text-red-500">{t("invalidIpAddr")}</p>
           )}
         </div>
@@ -162,25 +159,25 @@ export function ShadowsocksForm({
             type="number"
             min="1"
             max="65535"
-            value={ssConfig.listen_port}
+            value={flat.listen_port}
             onChange={(e) => {
-              const port = parsePort(e.target.value, ssConfig.listen_port)
-              setSsConfig({ ...ssConfig, listen_port: port })
+              const port = parsePort(e.target.value, flat.listen_port)
+              updateInbound({ listen_port: port })
             }}
-            className={!isValidPort(ssConfig.listen_port) ? "border-red-500" : ""}
+            className={!isValidPort(flat.listen_port) ? "border-red-500" : ""}
           />
-          {!isValidPort(ssConfig.listen_port) && (
+          {!isValidPort(flat.listen_port) && (
             <p className="text-xs text-red-500">{t("portRange")}</p>
           )}
         </div>
       </div>
-      
+
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>{t("encryption")}</Label>
           <Select
-            value={ssConfig.method}
-            onValueChange={(val) => setSsConfig({ ...ssConfig, method: val })}
+            value={flat.method}
+            onValueChange={(val) => updateInbound({ method: val })}
           >
             <SelectTrigger className="h-9 text-sm">
               <SelectValue />
@@ -199,12 +196,12 @@ export function ShadowsocksForm({
           </Select>
         </div>
         <div className="space-y-2">
-          <Label>{tc("password")} {ssConfig.method.startsWith("2022-") && t("ssPasswordLabel")}</Label>
+          <Label>{tc("password")} {flat.method.startsWith("2022-") && t("ssPasswordLabel")}</Label>
           <div className="flex gap-2">
             <Input
-              value={ssConfig.password}
-              onChange={(e) => setSsConfig({ ...ssConfig, password: e.target.value })}
-              placeholder={ssConfig.method.startsWith("2022-") ? t("clickGenerateBase64") : t("enterPassword")}
+              value={flat.password}
+              onChange={(e) => updateInbound({ password: e.target.value })}
+              placeholder={flat.method.startsWith("2022-") ? t("clickGenerateBase64") : t("enterPassword")}
               className="flex-1 h-9 text-sm"
             />
             <Button
@@ -212,13 +209,13 @@ export function ShadowsocksForm({
               variant="outline"
               size="sm"
               className="h-9 shrink-0"
-              onClick={() => setSsConfig({ ...ssConfig, password: generateSS2022Key(ssConfig.method) })}
+              onClick={() => updateInbound({ password: generateSS2022Key(flat.method) })}
             >
               <Key className="h-4 w-4 mr-1.5" />
               {tc("generate")}
             </Button>
           </div>
-          {ssConfig.method.startsWith("2022-") && (
+          {flat.method.startsWith("2022-") && (
             <p className="text-[10px] text-muted-foreground mt-1">
               {t("ss2022Hint")}
             </p>
@@ -235,16 +232,16 @@ export function ShadowsocksForm({
           <Button
             type="button"
             size="sm"
-            onClick={() => setSsConfig({ ...ssConfig, users: [...ssConfig.users, { name: "", password: "" }] })}
+            onClick={() => updateInbound({ users: [...flat.users, { name: "", password: "" }] })}
           >
             <Plus className="h-4 w-4 mr-1.5" />
             {t("addUser")}
           </Button>
         </div>
 
-        {ssConfig.users.length > 0 && (
+        {flat.users.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
-            {ssConfig.users.map((user, index) => (
+            {flat.users.map((user, index) => (
               <div key={index} className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative group transition-all duration-300">
                 <div className="space-y-4">
                   <div className="flex justify-between items-center mb-1">
@@ -258,12 +255,12 @@ export function ShadowsocksForm({
                       size="icon"
                       variant="ghost"
                       className="h-8 w-8 text-zinc-400 hover:text-destructive hover:bg-destructive/5 rounded-full"
-                      onClick={() => setSsConfig({ ...ssConfig, users: ssConfig.users.filter((_, i) => i !== index) })}
+                      onClick={() => updateInbound({ users: flat.users.filter((_, i) => i !== index) })}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold ml-1">{t("configuration")}</Label>
                     <div className="space-y-3 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
@@ -272,24 +269,22 @@ export function ShadowsocksForm({
                         <Input
                           value={user.name}
                           onChange={(e) => {
-                            const newUsers = [...ssConfig.users]
-                            newUsers[index] = { ...newUsers[index], name: e.target.value }
-                            setSsConfig({ ...ssConfig, users: newUsers })
+                            const users = flat.users.map((u, i) => i === index ? { ...u, name: e.target.value } : u)
+                            updateInbound({ users })
                           }}
                           placeholder="Name"
                           className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus-visible:ring-primary/20"
                         />
                       </div>
-                      
+
                       <div className="space-y-1.5">
                         <Label className="text-xs text-zinc-500">{tc("password")}</Label>
                         <div className="flex gap-2">
                           <Input
                             value={user.password}
                             onChange={(e) => {
-                              const newUsers = [...ssConfig.users]
-                              newUsers[index] = { ...newUsers[index], password: e.target.value }
-                              setSsConfig({ ...ssConfig, users: newUsers })
+                              const users = flat.users.map((u, i) => i === index ? { ...u, password: e.target.value } : u)
+                              updateInbound({ users })
                             }}
                             placeholder="Password"
                             className="flex-1 h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus-visible:ring-primary/20"
@@ -300,9 +295,8 @@ export function ShadowsocksForm({
                             size="icon"
                             className="h-9 w-9 shrink-0 border-zinc-200 dark:border-zinc-800"
                             onClick={() => {
-                              const newUsers = [...ssConfig.users]
-                              newUsers[index] = { ...newUsers[index], password: generateSS2022Key(ssConfig.method) }
-                              setSsConfig({ ...ssConfig, users: newUsers })
+                              const users = flat.users.map((u, i) => i === index ? { ...u, password: generateSS2022Key(flat.method) } : u)
+                              updateInbound({ users })
                             }}
                           >
                             <Key className="h-4 w-4" />
@@ -329,15 +323,14 @@ export function ShadowsocksForm({
               <p className="text-xs text-zinc-400 font-medium">{t("naiveNetwork")}</p>
             </div>
           </div>
-          
+
           <div className="space-y-4">
             <div className="space-y-1.5 ml-1">
               <Label className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Network Type</Label>
               <Select
-                value={ssConfig.network || NETWORK_BOTH_VALUE}
+                value={flat.network || NETWORK_BOTH_VALUE}
                 onValueChange={(val) =>
-                  setSsConfig({
-                    ...ssConfig,
+                  updateInbound({
                     network: (val === NETWORK_BOTH_VALUE ? "" : val) as "" | "tcp" | "udp",
                   })
                 }
@@ -368,22 +361,22 @@ export function ShadowsocksForm({
               <input
                 type="checkbox"
                 id="ss-multiplex"
-                checked={ssConfig.multiplex_enabled}
-                onChange={(e) => setSsConfig({ ...ssConfig, multiplex_enabled: e.target.checked })}
+                checked={flat.multiplex_enabled}
+                onChange={(e) => updateInbound({ multiplex_enabled: e.target.checked })}
                 className="h-4 w-4 rounded border-zinc-300 text-primary focus:ring-primary"
               />
             </div>
           </div>
 
-          {ssConfig.multiplex_enabled && (
+          {flat.multiplex_enabled && (
             <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
               <div className="flex flex-wrap gap-4 ml-1">
                 <div className="flex items-center space-x-2">
                   <input
                     type="checkbox"
                     id="ss-multiplex-padding"
-                    checked={ssConfig.multiplex_padding}
-                    onChange={(e) => setSsConfig({ ...ssConfig, multiplex_padding: e.target.checked })}
+                    checked={flat.multiplex_padding}
+                    onChange={(e) => updateInbound({ multiplex_padding: e.target.checked })}
                     className="h-4 w-4 rounded border-zinc-300 text-primary"
                   />
                   <Label htmlFor="ss-multiplex-padding" className="text-sm font-medium text-zinc-600 dark:text-zinc-400">{t("multiplexPadding")}</Label>
@@ -392,22 +385,22 @@ export function ShadowsocksForm({
                   <input
                     type="checkbox"
                     id="ss-multiplex-brutal"
-                    checked={ssConfig.multiplex_brutal}
-                    onChange={(e) => setSsConfig({ ...ssConfig, multiplex_brutal: e.target.checked })}
+                    checked={flat.multiplex_brutal}
+                    onChange={(e) => updateInbound({ multiplex_brutal: e.target.checked })}
                     className="h-4 w-4 rounded border-zinc-300 text-primary"
                   />
                   <Label htmlFor="ss-multiplex-brutal" className="text-sm font-medium text-zinc-600 dark:text-zinc-400">{t("enableBrutal")}</Label>
                 </div>
               </div>
 
-              {ssConfig.multiplex_brutal && (
+              {flat.multiplex_brutal && (
                 <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
                   <div className="space-y-1.5">
                     <Label className="text-xs text-zinc-500">{t("upMbps")}</Label>
                     <Input
                       type="number"
-                      value={ssConfig.multiplex_brutal_up}
-                      onChange={(e) => setSsConfig({ ...ssConfig, multiplex_brutal_up: parseInt(e.target.value) || 0 })}
+                      value={flat.multiplex_brutal_up}
+                      onChange={(e) => updateInbound({ multiplex_brutal_up: parseInt(e.target.value) || 0 })}
                       className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                     />
                   </div>
@@ -415,8 +408,8 @@ export function ShadowsocksForm({
                     <Label className="text-xs text-zinc-500">{t("downMbps")}</Label>
                     <Input
                       type="number"
-                      value={ssConfig.multiplex_brutal_down}
-                      onChange={(e) => setSsConfig({ ...ssConfig, multiplex_brutal_down: parseInt(e.target.value) || 0 })}
+                      value={flat.multiplex_brutal_down}
+                      onChange={(e) => updateInbound({ multiplex_brutal_down: parseInt(e.target.value) || 0 })}
                       className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                     />
                   </div>
@@ -426,9 +419,9 @@ export function ShadowsocksForm({
           )}
         </div>
       </div>
-      
+
       <div className="pt-2 border-t border-border/50">
-        <Button type="button" variant="outline" onClick={showShadowsocksQrCode} disabled={!ssConfig.password}>
+        <Button type="button" variant="outline" onClick={showShadowsocksQrCode} disabled={!flat.password}>
           <QrCode className="h-4 w-4 mr-1.5" />
           {t("generateQrCode")}
         </Button>
