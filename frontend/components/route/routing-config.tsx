@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useSingboxConfigStore, RouteRule, DNSOptions } from "@/lib/store/singbox-config"
+import { useSingboxConfigStore, RouteRule } from "@/lib/store/singbox-config"
 import { useTranslation } from "@/lib/i18n"
 import { parseLines, normalizeIpCidrs } from "./utils"
 import { DirectTab } from "./direct-tab"
@@ -25,10 +25,9 @@ interface RoutingConfigProps {
 const EMPTY_OUTBOUNDS: string[] = []
 
 export function RoutingConfig({ showCard = true, availableOutbounds = EMPTY_OUTBOUNDS }: RoutingConfigProps) {
-  const { config, setRouting, setDns } = useSingboxConfigStore()
+  const { config, setRouting } = useSingboxConfigStore()
   const { t } = useTranslation("routing")
   const initialConfig = config.route
-  const savedDnsRef = useRef<DNSOptions | undefined>(undefined)
 
   const [finalOutbound, setFinalOutbound] = useState("proxy_out")
   const [rules, setRules] = useState<RouteRule[]>([])
@@ -153,63 +152,11 @@ export function RoutingConfig({ showCard = true, availableOutbounds = EMPTY_OUTB
       ? "proxy_out"
       : (availableOutbounds.find((t) => t !== "direct" && t !== "block") || "proxy_out")
 
-    // Global mode: skip all split rules
+    // Global mode: DNS/route are fully managed by buildFullConfig; just set the final tag
     if (routeMode === "global_proxy" || routeMode === "global_direct") {
-      if (!savedDnsRef.current && config.dns) {
-        savedDnsRef.current = config.dns
-      }
-
-      let globalDns: DNSOptions
-      let dnsTag: string
-
-      if (routeMode === "global_proxy") {
-        dnsTag = "cloudflare_doh"
-        globalDns = {
-          servers: [
-            {
-              tag: dnsTag,
-              type: "https",
-              server: "cloudflare-dns.com",
-              path: "/dns-query",
-              detour: proxyTag,
-            },
-            {
-              tag: "local_resolver",
-              type: "udp",
-              server: "8.8.8.8",
-            },
-          ],
-          final: dnsTag,
-          independent_cache: true,
-        }
-      } else {
-        dnsTag = "alidns"
-        globalDns = {
-          servers: [
-            {
-              tag: dnsTag,
-              type: "udp",
-              server: "223.5.5.5",
-            },
-          ],
-          final: dnsTag,
-          independent_cache: true,
-        }
-      }
-
-      setDns(globalDns)
-
       const finalTag = routeMode === "global_proxy" ? proxyTag : "direct"
-      const routingConfig: any = { rules: [], final: finalTag }
-      routingConfig.default_domain_resolver = routeMode === "global_proxy" ? "local_resolver" : dnsTag
-      setRouting(routingConfig)
+      setRouting({ rules: [], final: finalTag })
       return
-    }
-
-    // Rule split mode: restore saved DNS
-    if (savedDnsRef.current) {
-      setDns(savedDnsRef.current)
-      savedDnsRef.current = undefined
     }
 
     const generatedRules: RouteRule[] = []
@@ -273,7 +220,7 @@ export function RoutingConfig({ showCard = true, availableOutbounds = EMPTY_OUTB
     blockDomains, blockIps,
     enableGfw, enableCnDomain, enableCnIp,
     enableBlockAds, enablePrivateIpDirect,
-    availableOutbounds, setRouting, setDns,
+    availableOutbounds, setRouting,
   ])
 
   const content = (

@@ -1086,7 +1086,7 @@ const defaultDns: DNSOptions = {
     {
       tag: "local_dns",
       type: "udp",
-      server: "223.5.5.5",
+      server: "8.8.8.8",
     },
     {
       tag: "remote_dns",
@@ -1725,29 +1725,42 @@ export const useSingboxConfigStore = create<SingboxConfigStore>((set, get) => ({
       }
     }
 
-    // If no proxy outbound, remove detour from DNS servers and remove rule_set based DNS rules
-    // (geo-based DNS routing is pointless when everything goes direct)
-    if (!hasProxyOutbound && fullConfig.dns) {
-      console.warn("[singbox-config] No proxy outbound found, auto-removing DNS detour and rule_set DNS rules")
+    // If no proxy outbound, override DNS and route with minimal direct config
+    // (split-routing DNS and geo rule_sets are pointless when everything goes direct)
+    if (!hasProxyOutbound) {
       fullConfig.dns = {
-        ...fullConfig.dns,
-        servers: (fullConfig.dns.servers || []).map((server) => {
-          if (server.detour) {
-            const { detour, ...rest } = server
-            return rest
-          }
-          return server
-        }),
-        // Remove DNS rules that use rule_set (they require route.rule_set definitions)
-        rules: (fullConfig.dns.rules || []).filter((rule) => !rule.rule_set || rule.rule_set.length === 0),
+        servers: [{ tag: "local_dns", type: "udp", server: "8.8.8.8" }],
+        final: "local_dns",
+        independent_cache: true,
       }
-      // If no rules left, remove the rules array entirely
-      if (fullConfig.dns.rules && fullConfig.dns.rules.length === 0) {
-        delete fullConfig.dns.rules
+      fullConfig.route = {
+        rules: [],
+        final: "proxy_out",
+        default_domain_resolver: "local_dns",
       }
+      return fullConfig
     }
 
-    // Get valid outbound tags
+    // Proxy outbound (non-balancer): override DNS and route with minimal global-proxy config
+    // local_resolver resolves the proxy server's own address; remote_dns handles client traffic
+    if (!balancerState.enabled) {
+      fullConfig.dns = {
+        servers: [
+          { tag: "remote_dns", type: "udp", server: "8.8.8.8", detour: "proxy_out" },
+          { tag: "local_resolver", type: "udp", server: "1.1.1.1" },
+        ],
+        final: "remote_dns",
+        independent_cache: true,
+      }
+      fullConfig.route = {
+        rules: [],
+        final: "proxy_out",
+        default_domain_resolver: "local_resolver",
+      }
+      return fullConfig
+    }
+
+    // Balancer mode: build urltest outbound and route from existing config
     const validOutboundTags = new Set(outbounds.map((o) => o.tag))
 
     // Helper function to generate rule_set definitions for used rule_set tags
@@ -1887,6 +1900,17 @@ export const useSingboxConfigStore = create<SingboxConfigStore>((set, get) => ({
           },
         ],
         final: "proxy_out",
+        default_domain_resolver: "local_dns",
+      }
+    }
+
+    // Ensure route.default_domain_resolver is always set (required by sing-box 1.12.0+)
+    if (fullConfig.route && !fullConfig.route.default_domain_resolver && fullConfig.dns?.servers) {
+      const ipResolver = fullConfig.dns.servers.find(
+        (s) => (s.type === "udp" || s.type === "tcp") && s.server && /^[\d.:]+$/.test(s.server)
+      )
+      if (ipResolver) {
+        fullConfig.route.default_domain_resolver = ipResolver.tag
       }
     }
 
