@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -175,7 +176,7 @@ func GetSingBoxVersion() (string, error) {
 	return ds.GetSingBoxVersion()
 }
 
-// SaveConfig 保存配置文件
+// SaveConfig 保存配置文件，并自动更新 tag->nodeName 旁路映射
 func SaveConfig(configData []byte) (string, error) {
 	// 确保 singbox 目录存在
 	if err := os.MkdirAll(singboxDir, 0755); err != nil {
@@ -188,7 +189,52 @@ func SaveConfig(configData []byte) (string, error) {
 		return "", fmt.Errorf("failed to save config: %w", err)
 	}
 
+	// 异步更新 tag->nodeName 映射（不阻塞保存流程）
+	go rebuildNodeMapping(configData)
+
 	return configPath, nil
+}
+
+// rebuildNodeMapping 从 config 的 outbounds 中提取 tag，与订阅节点匹配后更新映射文件
+func rebuildNodeMapping(configData []byte) {
+	var cfg struct {
+		Outbounds []map[string]interface{} `json:"outbounds"`
+	}
+	if err := json.Unmarshal(configData, &cfg); err != nil {
+		return
+	}
+
+	// 加载订阅节点，构建 server:port:type -> name 索引
+	subData, err := LoadSubscriptions()
+	if err != nil {
+		return
+	}
+	type key struct{ server string; port int; proto string }
+	nodeNameByKey := make(map[key]string)
+	for _, sub := range subData.Subscriptions {
+		for _, n := range sub.Nodes {
+			nodeNameByKey[key{n.Address, n.Port, n.Protocol}] = n.Name
+		}
+	}
+
+	mapping := LoadNodeMapping()
+	for _, ob := range cfg.Outbounds {
+		obType, _ := ob["type"].(string)
+		if obType == "direct" || obType == "block" || obType == "dns" || obType == "urltest" || obType == "selector" {
+			continue
+		}
+		tag, _ := ob["tag"].(string)
+		if tag == "" {
+			continue
+		}
+		server, _ := ob["server"].(string)
+		portFloat, _ := ob["server_port"].(float64)
+		port := int(portFloat)
+		if name, ok := nodeNameByKey[key{server, port, obType}]; ok {
+			mapping[tag] = name
+		}
+	}
+	_ = SaveNodeMapping(mapping)
 }
 
 // GetConfig 获取配置文件

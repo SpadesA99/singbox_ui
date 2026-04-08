@@ -3,19 +3,55 @@ package services
 import (
 	"encoding/json"
 	"log"
+	"sync"
 	"time"
 )
+
+// schedulerMu 防止调度器自身重入，以及与 HTTP handler 的并发冲突
+var schedulerMu sync.Mutex
+
+// proxyOutboundTypes 已知代理出站类型白名单（排除系统类型）
+var proxyOutboundTypes = map[string]bool{
+	"vless":        true,
+	"vmess":        true,
+	"trojan":       true,
+	"shadowsocks":  true,
+	"hysteria2":    true,
+	"tuic":         true,
+	"wireguard":    true,
+	"socks":        true,
+	"http":         true,
+	"ssh":          true,
+	"anytls":       true,
+	"shadowtls":    true,
+	"naive":        true,
+}
 
 // StartAutoUpdateScheduler 启动订阅自动更新调度器（后台 goroutine，每分钟检查一次）
 func StartAutoUpdateScheduler() {
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[scheduler] PANIC recovered: %v — scheduler stopped", r)
+			}
+		}()
 		ticker := time.NewTicker(1 * time.Minute)
 		defer ticker.Stop()
 		for range ticker.C {
-			checkAndAutoUpdateSubscriptions()
+			safeCheckAndAutoUpdate()
 		}
 	}()
 	log.Println("Auto-update scheduler started")
+}
+
+// safeCheckAndAutoUpdate 带 recover 的单次检查，防止单次 panic 杀死 goroutine
+func safeCheckAndAutoUpdate() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[scheduler] PANIC in check cycle: %v", r)
+		}
+	}()
+	checkAndAutoUpdateSubscriptions()
 }
 
 // checkAndAutoUpdateSubscriptions 检查并自动更新到期的订阅
@@ -34,7 +70,11 @@ func checkAndAutoUpdateSubscriptions() {
 		needUpdate := true
 		if sub.LastUpdated != "" {
 			lastUpdated, err := time.Parse(time.RFC3339, sub.LastUpdated)
-			if err == nil {
+			if err != nil {
+				// 格式损坏，记录错误并跳过本次更新，避免无限重试
+				log.Printf("[scheduler] Failed to parse LastUpdated for %s (%q): %v — skipping", sub.Name, sub.LastUpdated, err)
+				needUpdate = false
+			} else {
 				elapsed := now.Sub(lastUpdated)
 				if elapsed < time.Duration(sub.UpdateInterval)*time.Hour {
 					needUpdate = false
@@ -43,127 +83,154 @@ func checkAndAutoUpdateSubscriptions() {
 		}
 
 		if needUpdate {
-			log.Printf("Auto-updating subscription: %s", sub.Name)
+			log.Printf("[scheduler] Auto-updating subscription: %s", sub.Name)
 			updated, err := UpdateSubscription(sub.ID)
 			if err != nil {
-				log.Printf("Failed to auto-update subscription %s: %v", sub.Name, err)
+				log.Printf("[scheduler] Failed to auto-update subscription %s: %v", sub.Name, err)
 				continue
 			}
-			log.Printf("Auto-update success: %s (%d nodes)", sub.Name, len(updated.Nodes))
+			log.Printf("[scheduler] Auto-update success: %s (%d nodes)", sub.Name, len(updated.Nodes))
 
-			// 将更新后的节点同步到正在运行的容器配置
+			if len(updated.Nodes) == 0 {
+				log.Printf("[scheduler] Empty node list for %s, skipping container sync", sub.Name)
+				continue
+			}
+
 			applySubscriptionToRunningContainers(updated.Nodes)
 		}
 	}
 }
 
 // applySubscriptionToRunningContainers 将订阅节点更新应用到正在运行的容器
-// 匹配优先级：1) outbound tag 精确匹配  2) _node_name 备用匹配（服务器地址变更时）
 func applySubscriptionToRunningContainers(nodes []ProxyNode) {
-	nodeByTag := make(map[string]ProxyNode, len(nodes))
+	// 构建 name -> node 映射（备用匹配）
 	nodeByName := make(map[string]ProxyNode, len(nodes))
 	for _, n := range nodes {
-		tag := ""
-		if n.Outbound != nil {
-			if t, ok := n.Outbound["tag"].(string); ok {
-				tag = t
-			}
-		}
-		if tag == "" {
-			tag = SanitizeTag(n.Protocol, n.Address, n.Port)
-		}
-		nodeByTag[tag] = n
 		if n.Name != "" {
 			nodeByName[n.Name] = n
 		}
 	}
 
+	// 加载 tag -> nodeName 旁路映射
+	tagToName := LoadNodeMapping()
+
 	// 1. 默认容器 (singboxDir/config.json)
-	applyToDefaultContainer(nodeByTag, nodeByName)
+	applyToDefaultContainer(tagToName, nodeByName)
 
 	// 2. 所有命名实例 (singboxDir/configs/*/config.json)
-	applyToNamedContainers(nodeByTag, nodeByName)
+	applyToNamedContainers(tagToName, nodeByName)
 }
 
 // applyToDefaultContainer 更新默认容器配置
-func applyToDefaultContainer(nodeByTag, nodeByName map[string]ProxyNode) {
+func applyToDefaultContainer(tagToName map[string]string, nodeByName map[string]ProxyNode) {
 	configData, err := GetConfig()
 	if err != nil {
-		return // 配置文件不存在，跳过
+		return
 	}
 
-	updated, changed := injectNodeIntoConfig(configData, nodeByTag, nodeByName)
+	updated, changed := injectNodeIntoConfig(configData, tagToName, nodeByName)
 	if !changed {
 		return
 	}
 
-	if _, err := SaveConfig(updated); err != nil {
-		log.Printf("[scheduler] Failed to save default config: %v", err)
-		return
-	}
-
-	// 如果容器正在运行则重启
-	running, _ := CheckContainerRunning()
-	if !running {
-		return
-	}
-
-	log.Printf("[scheduler] Restarting default container after subscription update")
-	if err := StopSingboxContainer(); err != nil {
-		log.Printf("[scheduler] Failed to stop default container: %v", err)
-		return
-	}
-	if _, err := RunSingboxContainer(); err != nil {
-		log.Printf("[scheduler] Failed to restart default container: %v", err)
-	} else {
-		log.Printf("[scheduler] Default container restarted with updated node")
-	}
+	restartWithNewConfig(
+		updated, configData,
+		func(data []byte) error { _, err := SaveConfig(data); return err },
+		func() (bool, string) { return CheckContainerRunning() },
+		func() error { return StopSingboxContainer() },
+		func() error { _, err := RunSingboxContainer(); return err },
+		"default",
+	)
 }
 
 // applyToNamedContainers 更新所有命名实例配置
-func applyToNamedContainers(nodeByTag, nodeByName map[string]ProxyNode) {
+func applyToNamedContainers(tagToName map[string]string, nodeByName map[string]ProxyNode) {
 	configs, err := ListNamedConfigs()
 	if err != nil {
 		return
 	}
 
 	for _, cfg := range configs {
-		configData, err := LoadNamedConfigFromDir(cfg.Name)
+		name := cfg.Name
+		configData, err := LoadNamedConfigFromDir(name)
 		if err != nil {
 			continue
 		}
 
-		updated, changed := injectNodeIntoConfig(configData, nodeByTag, nodeByName)
+		updated, changed := injectNodeIntoConfig(configData, tagToName, nodeByName)
 		if !changed {
 			continue
 		}
 
-		if err := SaveNamedConfigWithDir(cfg.Name, updated); err != nil {
-			log.Printf("[scheduler] Failed to save config for instance %s: %v", cfg.Name, err)
-			continue
-		}
-
-		if !cfg.Running {
-			continue
-		}
-
-		log.Printf("[scheduler] Restarting instance %s after subscription update", cfg.Name)
-		if err := StopNamedContainer(cfg.Name); err != nil {
-			log.Printf("[scheduler] Failed to stop instance %s: %v", cfg.Name, err)
-			continue
-		}
-		if _, err := RunNamedContainer(cfg.Name); err != nil {
-			log.Printf("[scheduler] Failed to restart instance %s: %v", cfg.Name, err)
-		} else {
-			log.Printf("[scheduler] Instance %s restarted with updated node", cfg.Name)
-		}
+		running := cfg.Running
+		restartWithNewConfig(
+			updated, configData,
+			func(data []byte) error { return SaveNamedConfigWithDir(name, data) },
+			func() (bool, string) {
+				if !running {
+					return false, ""
+				}
+				return GetNamedContainerStatus(name)
+			},
+			func() error { return StopNamedContainer(name) },
+			func() error { _, err := RunNamedContainer(name); return err },
+			"instance:"+name,
+		)
 	}
 }
 
-// injectNodeIntoConfig 在 config JSON 中找到匹配的 outbound 并替换节点数据
-// 匹配优先级：1) tag 精确匹配  2) _node_name 备用匹配（服务器地址变更时）
-// 返回更新后的 JSON 和是否发生变化
-func injectNodeIntoConfig(configData []byte, nodeByTag, nodeByName map[string]ProxyNode) ([]byte, bool) {
+// restartWithNewConfig 保存新配置并重启容器，失败时回滚旧配置
+func restartWithNewConfig(
+	newConfig, oldConfig []byte,
+	saveFn func([]byte) error,
+	isRunningFn func() (bool, string),
+	stopFn func() error,
+	runFn func() error,
+	label string,
+) {
+	schedulerMu.Lock()
+	defer schedulerMu.Unlock()
+
+	if err := saveFn(newConfig); err != nil {
+		log.Printf("[scheduler] Failed to save config for %s: %v", label, err)
+		return
+	}
+
+	running, _ := isRunningFn()
+	if !running {
+		log.Printf("[scheduler] Config updated for %s (container not running)", label)
+		return
+	}
+
+	log.Printf("[scheduler] Restarting %s after subscription update", label)
+
+	if err := stopFn(); err != nil {
+		log.Printf("[scheduler] Failed to stop %s: %v", label, err)
+		return
+	}
+
+	if err := runFn(); err != nil {
+		log.Printf("[scheduler] CRITICAL: Failed to restart %s: %v — rolling back config", label, err)
+		// 回滚旧配置
+		if rbErr := saveFn(oldConfig); rbErr != nil {
+			log.Printf("[scheduler] CRITICAL: Rollback also failed for %s: %v", label, rbErr)
+			return
+		}
+		// 尝试用旧配置重启
+		if err2 := runFn(); err2 != nil {
+			log.Printf("[scheduler] CRITICAL: Rollback restart also failed for %s: %v — service is down", label, err2)
+		} else {
+			log.Printf("[scheduler] Rolled back and restarted %s with old config", label)
+		}
+		return
+	}
+
+	log.Printf("[scheduler] %s restarted with updated node config", label)
+}
+
+// injectNodeIntoConfig 在 config JSON 中找到匹配的 outbound 并增量更新节点数据
+// 匹配优先级：1) tag->name 映射 + nodeByName  2) 无法匹配则跳过
+func injectNodeIntoConfig(configData []byte, tagToName map[string]string, nodeByName map[string]ProxyNode) ([]byte, bool) {
 	var cfg map[string]interface{}
 	if err := json.Unmarshal(configData, &cfg); err != nil {
 		return configData, false
@@ -178,7 +245,6 @@ func injectNodeIntoConfig(configData []byte, nodeByTag, nodeByName map[string]Pr
 		return configData, false
 	}
 
-	// 遍历所有 outbound，找到 tag 在订阅节点里的（跳过 direct/block/dns/urltest）
 	changed := false
 	for i, ob := range outbounds {
 		obMap, ok := ob.(map[string]interface{})
@@ -186,7 +252,8 @@ func injectNodeIntoConfig(configData []byte, nodeByTag, nodeByName map[string]Pr
 			continue
 		}
 		obType, _ := obMap["type"].(string)
-		if obType == "direct" || obType == "block" || obType == "dns" || obType == "urltest" {
+		// 白名单：只处理已知代理类型
+		if !proxyOutboundTypes[obType] {
 			continue
 		}
 		tag, _ := obMap["tag"].(string)
@@ -194,30 +261,31 @@ func injectNodeIntoConfig(configData []byte, nodeByTag, nodeByName map[string]Pr
 			continue
 		}
 
-		// 优先 tag 匹配，备用 _node_name 匹配
-		node, found := nodeByTag[tag]
-		if !found {
-			nodeName, _ := obMap["_node_name"].(string)
-			if nodeName != "" {
-				node, found = nodeByName[nodeName]
-			}
+		// 通过 tag->name 映射找到节点名，再从 nodeByName 找到新节点
+		nodeName, hasMapped := tagToName[tag]
+		if !hasMapped {
+			continue
 		}
+		node, found := nodeByName[nodeName]
 		if !found || node.Outbound == nil {
 			continue
 		}
 
-		// 替换整个 outbound，保留原 tag 和 _node_name
+		// 增量覆盖：在原 outbound 基础上覆盖连接相关字段，保留用户自定义字段
 		newOb := make(map[string]interface{})
+		for k, v := range obMap {
+			newOb[k] = v
+		}
+		// 覆盖节点核心连接字段
 		for k, v := range node.Outbound {
 			newOb[k] = v
 		}
+		// 强制保留原 tag（路由规则引用的是原 tag）
 		newOb["tag"] = tag
-		if nodeName, _ := obMap["_node_name"].(string); nodeName != "" {
-			newOb["_node_name"] = nodeName
-		}
+
 		outbounds[i] = newOb
 		changed = true
-		log.Printf("[scheduler] Updated outbound tag=%s type=%s", tag, obType)
+		log.Printf("[scheduler] Updated outbound tag=%s type=%s node=%s", tag, obType, nodeName)
 	}
 
 	if !changed {

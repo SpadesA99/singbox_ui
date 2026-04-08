@@ -120,7 +120,7 @@ export function OutboundConfig({ showCard = true }: OutboundConfigProps) {
       setOutbound(0, { type: "block", tag: "block" })
     } else if (outboundType === "subscription") {
       if (selectedNode?.outbound && selectedNode !== prevSelectedNodeRef.current) {
-        const outboundWithProxyTag = { ...selectedNode.outbound, tag: "proxy_out", _node_name: selectedNode.name } as any
+        const outboundWithProxyTag = { ...selectedNode.outbound, tag: "proxy_out" } as any
         setOutbound(0, outboundWithProxyTag)
         prevSelectedNodeRef.current = selectedNode
       } else if (!selectedNode && hasUserChangedTabRef.current) {
@@ -185,7 +185,7 @@ export function OutboundConfig({ showCard = true }: OutboundConfigProps) {
   const handleSelectNode = (node: ProxyNode) => {
     setSelectedNode(node)
     if (node.outbound) {
-      const outboundWithProxyTag = { ...node.outbound, tag: "proxy_out", _node_name: node.name } as any
+      const outboundWithProxyTag = { ...node.outbound, tag: "proxy_out" } as any
       setOutbound(0, outboundWithProxyTag)
     }
     const nodeName = String(node.name || 'Unknown')
