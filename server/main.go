@@ -113,6 +113,14 @@ func main() {
 			prober.POST("/save", handlers.SaveProbeResultsToSubscription)
 		}
 
+		// 代理测速：启动临时 sing-box 实例通过 SOCKS/HTTP 代理测试节点
+		speedtest := api.Group("/speedtest")
+		{
+			speedtest.POST("/start", handlers.StartSpeedTest)
+			speedtest.GET("/status", handlers.GetSpeedTestStatus)
+			speedtest.POST("/stop", handlers.StopSpeedTest)
+		}
+
 	}
 
 	// 健康检查

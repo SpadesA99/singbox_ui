@@ -222,6 +222,35 @@ class ApiClient {
       method: 'POST',
     });
   }
+
+  // ========== 代理测速 API（启动临时 sing-box 实例通过 SOCKS 代理测试） ==========
+
+  async startSpeedTest(): Promise<{ message: string }> {
+    return this.request('/api/speedtest/start', { method: 'POST' });
+  }
+
+  async getSpeedTestStatus(): Promise<{
+    running: boolean;
+    total: number;
+    done: number;
+    current?: string;
+    started_at?: string;
+    results: Record<string, {
+      tag: string;
+      name: string;
+      status: string;
+      latency_ms: number;
+      speed_kbps: number;
+      error?: string;
+      tested_at?: string;
+    }>;
+  }> {
+    return this.request('/api/speedtest/status', { method: 'GET' });
+  }
+
+  async stopSpeedTest(): Promise<{ message: string }> {
+    return this.request('/api/speedtest/stop', { method: 'POST' });
+  }
 }
 
 // 导出 API 客户端实例

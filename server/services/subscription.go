@@ -32,6 +32,7 @@ type ProxyNode struct {
 	Online      bool   `json:"online,omitempty"`       // 是否在线
 	LastProbe   string `json:"last_probe,omitempty"`   // 最后测速时间
 	SuccessRate int    `json:"success_rate,omitempty"` // 成功率（0-100）
+	SpeedKBps   float64 `json:"speed_kbps,omitempty"`  // 代理下载速度 KB/s
 }
 
 // decodeBase64 解码 Base64 字符串，自动处理 padding 和 URL 安全编码
@@ -1369,5 +1370,47 @@ func UpdateProbeResults(results []ProbeResultUpdate) error {
 		}
 	}
 
+	return SaveSubscriptions(*data)
+}
+
+// SpeedTestUpdate 代理测速结果更新
+type SpeedTestUpdate struct {
+	Tag       string  `json:"tag"`
+	Latency   int64   `json:"latency"`
+	SpeedKBps float64 `json:"speed_kbps"`
+	Online    bool    `json:"online"`
+	LastProbe string  `json:"last_probe"`
+}
+
+// UpdateSpeedTestResults 写入代理测速结果到订阅文件（含速度）
+func UpdateSpeedTestResults(results []SpeedTestUpdate) error {
+	data, err := LoadSubscriptions()
+	if err != nil {
+		return err
+	}
+	m := make(map[string]SpeedTestUpdate, len(results))
+	for _, r := range results {
+		m[r.Tag] = r
+	}
+	for i := range data.Subscriptions {
+		for j := range data.Subscriptions[i].Nodes {
+			node := &data.Subscriptions[i].Nodes[j]
+			tag := ""
+			if node.Outbound != nil {
+				if t, ok := node.Outbound["tag"].(string); ok {
+					tag = t
+				}
+			}
+			if tag == "" {
+				tag = SanitizeTag(node.Protocol, node.Address, node.Port)
+			}
+			if r, ok := m[tag]; ok {
+				node.Latency = r.Latency
+				node.SpeedKBps = r.SpeedKBps
+				node.Online = r.Online
+				node.LastProbe = r.LastProbe
+			}
+		}
+	}
 	return SaveSubscriptions(*data)
 }

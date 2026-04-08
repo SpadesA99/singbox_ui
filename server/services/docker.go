@@ -475,6 +475,70 @@ func (d *DockerService) CheckNamedConfig(configName string, hostConfigDir string
 	return true, output, nil
 }
 
+// SpeedTestContainerName 临时测速容器名称
+const SpeedTestContainerName = "sing-box-speedtest"
+
+// StartSpeedTestContainer 启动用于代理测速的临时容器
+func (d *DockerService) StartSpeedTestContainer(hostConfigDir string) error {
+	_ = d.StopSpeedTestContainer()
+
+	hostSingboxDir, err := resolveHostConfigDir(hostConfigDir)
+	if err != nil {
+		return fmt.Errorf("resolve host dir: %w", err)
+	}
+
+	createCfg := &container.Config{
+		Image: SingBoxImageName,
+		Cmd:   []string{"-D", ContainerDataDir, "-C", ContainerConfigDir + "/", "run"},
+	}
+	hostCfg := &container.HostConfig{
+		NetworkMode: "host",
+		Mounts: []mount.Mount{
+			{
+				Type:     mount.TypeBind,
+				Source:   hostSingboxDir,
+				Target:   ContainerConfigDir,
+				ReadOnly: true,
+			},
+		},
+		CapAdd: []string{"NET_ADMIN"},
+	}
+
+	// ContainerRemove 返回后 Docker daemon 可能还没完全释放容器名，
+	// 重试以避免 "container name already in use" 的竞态
+	var resp container.CreateResponse
+	for attempt := 0; attempt < 5; attempt++ {
+		resp, err = d.cli.ContainerCreate(d.ctx, createCfg, hostCfg, nil, nil, SpeedTestContainerName)
+		if err == nil {
+			break
+		}
+		if !strings.Contains(err.Error(), "already in use") && !strings.Contains(err.Error(), "Conflict") {
+			return fmt.Errorf("create: %w", err)
+		}
+		_ = d.StopSpeedTestContainer()
+		time.Sleep(200 * time.Millisecond)
+	}
+	if err != nil {
+		return fmt.Errorf("create after retries: %w", err)
+	}
+
+	if err := d.cli.ContainerStart(d.ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+		_ = d.cli.ContainerRemove(d.ctx, resp.ID, types.ContainerRemoveOptions{Force: true})
+		return fmt.Errorf("start: %w", err)
+	}
+	return nil
+}
+
+// StopSpeedTestContainer 停止并删除测速容器
+func (d *DockerService) StopSpeedTestContainer() error {
+	if err := d.cli.ContainerRemove(d.ctx, SpeedTestContainerName, types.ContainerRemoveOptions{
+		Force: true,
+	}); err != nil && !strings.Contains(err.Error(), "No such container") {
+		return err
+	}
+	return nil
+}
+
 // stripAnsi 去除字符串中的 ANSI 转义序列
 func stripAnsi(s string) string {
 	re := regexp.MustCompile(`\x1b\[[0-9;]*m`)

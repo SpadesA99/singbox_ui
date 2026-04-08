@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Download, Loader2, RefreshCw, Trash2, Plus, ChevronDown, ChevronRight, Zap, Clock } from "lucide-react"
+import { Download, Loader2, RefreshCw, Trash2, Plus, ChevronDown, ChevronRight, Zap, Clock, Gauge } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { apiClient } from "@/lib/api"
 import { useTranslation } from "@/lib/i18n"
@@ -75,6 +75,8 @@ export function SubscriptionManager({ onNodeSelect, onNodesLoaded }: Subscriptio
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set())
   const [selectedNode, setSelectedNode] = useState<ProxyNode | null>(null)
   const [probing, setProbing] = useState(false)
+  const [speedTesting, setSpeedTesting] = useState(false)
+  const [speedTestProgress, setSpeedTestProgress] = useState<{ done: number; total: number; current?: string } | null>(null)
 
   const updateSettings = async (id: string, autoUpdate: boolean, updateInterval: number) => {
     try {
@@ -352,6 +354,58 @@ export function SubscriptionManager({ onNodeSelect, onNodesLoaded }: Subscriptio
     }
   }
 
+  // 代理测速：启动临时 sing-box 实例通过 SOCKS 代理逐个测试节点延迟与下载速度
+  const runSpeedTest = async () => {
+    if (subscriptions.length === 0) {
+      toast({ title: t("noNodesForProbe"), description: t("noNodesForProbeHint"), variant: "destructive" })
+      return
+    }
+    setSpeedTesting(true)
+    setSpeedTestProgress({ done: 0, total: 0 })
+    try {
+      await apiClient.startSpeedTest()
+      toast({ title: t("speedTestStarted"), description: t("speedTestStartedDesc") })
+
+      // 循环轮询直到后端上报 running=false；连续失败 20 次后强制退出
+      await new Promise((r) => setTimeout(r, 1000))
+      let consecutiveErrors = 0
+      const MAX_POLL_ERRORS = 20
+      while (true) {
+        try {
+          const status = await apiClient.getSpeedTestStatus()
+          consecutiveErrors = 0
+          setSpeedTestProgress({ done: status.done, total: status.total, current: status.current })
+          if (!status.running) {
+            await loadSubscriptions()
+            const ok = Object.values(status.results || {}).filter((r: any) => r.status === "ok").length
+            toast({ title: t("speedTestComplete"), description: t("speedTestCompleteDesc", { ok, total: status.total }) })
+            break
+          }
+        } catch {
+          consecutiveErrors++
+          if (consecutiveErrors >= MAX_POLL_ERRORS) {
+            toast({ title: t("speedTestFailed"), description: "status polling failed", variant: "destructive" })
+            break
+          }
+        }
+        await new Promise((r) => setTimeout(r, 1500))
+      }
+    } catch (error) {
+      toast({ title: t("speedTestFailed"), description: String(error), variant: "destructive" })
+    } finally {
+      setSpeedTesting(false)
+      setSpeedTestProgress(null)
+    }
+  }
+
+  const cancelSpeedTest = async () => {
+    try {
+      await apiClient.stopSpeedTest()
+    } catch {
+      // 忽略错误——后台 goroutine 结束后下一轮轮询会自然收尾并 reset UI state
+    }
+  }
+
   const totalNodes = subscriptions.reduce((sum, sub) => sum + (sub.nodes?.length || 0), 0)
 
   if (initialLoading) {
@@ -375,7 +429,7 @@ export function SubscriptionManager({ onNodeSelect, onNodesLoaded }: Subscriptio
             <>
               <Button
                 onClick={probeNodes}
-                disabled={probing}
+                disabled={probing || speedTesting}
                 variant="outline"
                 size="sm"
               >
@@ -385,6 +439,22 @@ export function SubscriptionManager({ onNodeSelect, onNodesLoaded }: Subscriptio
                   <Zap className="h-4 w-4 mr-1" />
                 )}
                 {t("probe")}
+              </Button>
+              <Button
+                onClick={speedTesting ? cancelSpeedTest : runSpeedTest}
+                disabled={probing}
+                variant={speedTesting ? "destructive" : "outline"}
+                size="sm"
+                title={t("speedTestTooltip")}
+              >
+                {speedTesting ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                ) : (
+                  <Gauge className="h-4 w-4 mr-1" />
+                )}
+                {speedTesting && speedTestProgress
+                  ? t("speedTestProgress", { done: speedTestProgress.done, total: speedTestProgress.total })
+                  : t("speedTest")}
               </Button>
               <Button
                 onClick={refreshAll}
