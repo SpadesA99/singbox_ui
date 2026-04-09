@@ -28,6 +28,10 @@ interface ProxyNode {
   port: number
   settings: Record<string, any>
   outbound: Record<string, any>
+  latency?: number
+  online?: boolean
+  last_probe?: string
+  speed_kbps?: number
 }
 
 interface SubscriptionEntry {
@@ -359,9 +363,31 @@ export function OutboundConfig({ showCard = true }: OutboundConfigProps) {
                                   {nodeType.toUpperCase()}
                                 </span>
                               </div>
-                              <span className="text-xs text-muted-foreground flex-shrink-0">
-                                {address}:{port}
-                              </span>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {node.last_probe && (
+                                  <span className={`text-xs font-medium ${
+                                    node.online
+                                      ? (node.latency || 0) < 200
+                                        ? "text-green-500"
+                                        : (node.latency || 0) < 500
+                                        ? "text-yellow-500"
+                                        : "text-orange-500"
+                                      : "text-red-500"
+                                  }`}>
+                                    {node.online ? `${node.latency}ms` : t("timeout")}
+                                  </span>
+                                )}
+                                {node.last_probe && node.online && node.speed_kbps != null && node.speed_kbps > 0 && (
+                                  <span className="text-xs font-medium text-blue-500">
+                                    {node.speed_kbps >= 1024
+                                      ? `${(node.speed_kbps / 1024).toFixed(1)}MB/s`
+                                      : `${Math.round(node.speed_kbps)}KB/s`}
+                                  </span>
+                                )}
+                                <span className="text-xs text-muted-foreground">
+                                  {address}:{port}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         )

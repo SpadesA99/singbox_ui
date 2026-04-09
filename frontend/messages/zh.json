@@ -445,6 +445,7 @@
   "outbound": {
     "title": "出站配置",
     "description": "配置转发连接的目标和协议",
+    "timeout": "超时",
     "sourceType": "配置来源",
     "subscription": "订阅节点",
     "manual": "手动配置",

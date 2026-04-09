@@ -445,6 +445,7 @@
   "outbound": {
     "title": "Outbound Config",
     "description": "Configure outgoing connection targets and protocols",
+    "timeout": "Timeout",
     "sourceType": "Config Source",
     "subscription": "Subscription Nodes",
     "manual": "Manual Config",
