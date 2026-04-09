@@ -44,7 +44,6 @@ import {
   Globe,
   Copy,
   Plus,
-  Play,
   Square,
   Trash2,
   Pencil,
@@ -428,15 +427,10 @@ export default function Home() {
 
             {currentInstance && currentInstanceInfo && (
               <div className="flex items-center gap-2 mr-2">
-                {currentInstanceInfo.running ? (
+                {currentInstanceInfo.running && (
                   <Button variant="outline" size="sm" className="h-9 border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-400" onClick={() => handleStopInstance(currentInstance)} disabled={actionLoading === currentInstance}>
                     {actionLoading === currentInstance ? <RotateCw className="h-4 w-4 mr-2 animate-spin" /> : <Square className="h-4 w-4 mr-2" />}
                     {t("stopContainer")}
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" className="h-9 border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-400" onClick={() => handleRunInstance(currentInstance)} disabled={actionLoading === currentInstance}>
-                    {actionLoading === currentInstance ? <RotateCw className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-                    {t("startContainer")}
                   </Button>
                 )}
                 <Button variant="outline" size="sm" className="h-9" onClick={handleViewLogs} disabled={!currentInstanceInfo.running}>
