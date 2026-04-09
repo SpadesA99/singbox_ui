@@ -627,12 +627,12 @@
     "blockDesc": "加入的域名和 IP 将被阻断，无法访问",
     "domainListLabel": "域名列表（每行一个）",
     "ipListLabel": "IP / CIDR 列表（每行一个）",
-    "domainSuffixHint": "匹配方式为域名后缀 (domain_suffix)，如输入 {example} 会匹配 *.{example}",
-    "directDomainsPlaceholder": "baidu.com\nqq.com\ntaobao.com\n# 以 # 开头的行为注释",
+    "domainSuffixHint": "默认后缀匹配，支持前缀：full:（精确）、keyword:（关键词）、regex:（正则）、suffix:（后缀）。如 google.com 匹配 *.google.com，full:www.google.com 仅精确匹配",
+    "directDomainsPlaceholder": "baidu.com\nqq.com\nfull:www.taobao.com\nkeyword:alipay\n# 以 # 开头的行为注释",
     "directIpsPlaceholder": "192.168.0.0/16\n10.0.0.0/8\n# 纯 IP 会自动补 /32",
-    "proxyDomainsPlaceholder": "google.com\nyoutube.com\ngithub.com\n# 以 # 开头的行为注释",
+    "proxyDomainsPlaceholder": "google.com\nyoutube.com\nfull:www.github.com\nkeyword:openai\n# 以 # 开头的行为注释",
     "proxyIpsPlaceholder": "8.8.8.8\n1.1.1.1\n# 纯 IP 会自动补 /32",
-    "blockDomainsPlaceholder": "ads.example.com\ntracker.example.com\n# 以 # 开头的行为注释",
+    "blockDomainsPlaceholder": "ads.example.com\nkeyword:tracker\nregex:.*\\.ad\\..*\n# 以 # 开头的行为注释",
     "blockIpsPlaceholder": "# 屏蔽特定 IP\n203.0.113.0/24",
     "privateIpLabel": "私有 IP 直连 (10.x, 172.16.x, 192.168.x 等)",
     "blockAdsLabel": "屏蔽广告域名 (geosite-category-ads-all)",
@@ -645,7 +645,7 @@
     "enableCnIp": "启用中国 IP 直连",
     "cnIpDesc": "使用 geoip-cn 规则集，目标 IP 在中国大陆范围内的连接将直连。",
     "cnIpSource": "来源: github.com/SagerNet/sing-geoip",
-    "domainSuffixMethod": "匹配方式为域名后缀 (domain_suffix)"
+    "domainSuffixMethod": "默认后缀匹配，支持前缀：full:（精确）、keyword:（关键词）、regex:（正则）"
   },
   "dns": {
     "title": "DNS 配置",

@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useSingboxConfigStore, RouteRule } from "@/lib/store/singbox-config"
 import { useTranslation } from "@/lib/i18n"
-import { parseLines, normalizeIpCidrs } from "./utils"
+import { parseLines, normalizeIpCidrs, parseDomainLines, domainFieldsToLines, applyDomainGroups, hasDomainEntries } from "./utils"
 import { DirectTab } from "./direct-tab"
 import { ProxyTab } from "./proxy-tab"
 import { BlockTab } from "./block-tab"
@@ -98,15 +98,16 @@ export function RoutingConfig({ showCard = true, availableOutbounds = EMPTY_OUTB
         setEnablePrivateIpDirect(true); classified = true
       }
 
-      // Detect simple domain/IP rules
+      // Detect simple domain/IP rules (支持 domain, domain_suffix, domain_keyword, domain_regex)
       if (!classified) {
-        const hasDomains = (rule.domain_suffix?.length || 0) > 0 || (rule.domain?.length || 0) > 0
+        const hasDomains = (rule.domain_suffix?.length || 0) > 0 || (rule.domain?.length || 0) > 0 ||
+          (rule.domain_keyword?.length || 0) > 0 || (rule.domain_regex?.length || 0) > 0
         const hasIps = (rule.ip_cidr?.length || 0) > 0
         const isSimple = !rule.port && !rule.protocol && !rule.inbound &&
           !rule.network && !rule.clash_mode && !rule.rule_set
 
         if (isSimple && (hasDomains || hasIps) && rule.action === "route") {
-          const targetDomains = [...(rule.domain_suffix || []), ...(rule.domain || [])]
+          const targetDomains = domainFieldsToLines(rule)
           const targetIps = rule.ip_cidr || []
 
           if (rule.outbound === "direct") {
@@ -165,10 +166,12 @@ export function RoutingConfig({ showCard = true, availableOutbounds = EMPTY_OUTB
     if (enableBlockAds) {
       generatedRules.push({ action: "route", outbound: "block", rule_set: ["geosite-category-ads-all"] })
     }
-    const blockDomainList = parseLines(blockDomains)
+    const blockDomainGroups = parseDomainLines(blockDomains)
     const blockIpList = parseLines(blockIps)
-    if (blockDomainList.length > 0) {
-      generatedRules.push({ action: "route", outbound: "block", domain_suffix: blockDomainList })
+    if (hasDomainEntries(blockDomainGroups)) {
+      const rule: any = { action: "route", outbound: "block" }
+      applyDomainGroups(rule, blockDomainGroups)
+      generatedRules.push(rule)
     }
     if (blockIpList.length > 0) {
       generatedRules.push({ action: "route", outbound: "block", ip_cidr: normalizeIpCidrs(blockIpList) })
@@ -178,10 +181,12 @@ export function RoutingConfig({ showCard = true, availableOutbounds = EMPTY_OUTB
     if (enablePrivateIpDirect) {
       generatedRules.push({ action: "route", outbound: "direct", ip_is_private: true })
     }
-    const directDomainList = parseLines(directDomains)
+    const directDomainGroups = parseDomainLines(directDomains)
     const directIpList = parseLines(directIps)
-    if (directDomainList.length > 0) {
-      generatedRules.push({ action: "route", outbound: "direct", domain_suffix: directDomainList })
+    if (hasDomainEntries(directDomainGroups)) {
+      const rule: any = { action: "route", outbound: "direct" }
+      applyDomainGroups(rule, directDomainGroups)
+      generatedRules.push(rule)
     }
     if (directIpList.length > 0) {
       generatedRules.push({ action: "route", outbound: "direct", ip_cidr: normalizeIpCidrs(directIpList) })
@@ -194,10 +199,12 @@ export function RoutingConfig({ showCard = true, availableOutbounds = EMPTY_OUTB
     }
 
     // Priority 3: proxy rules
-    const proxyDomainList = parseLines(proxyDomains)
+    const proxyDomainGroups = parseDomainLines(proxyDomains)
     const proxyIpList = parseLines(proxyIps)
-    if (proxyDomainList.length > 0) {
-      generatedRules.push({ action: "route", outbound: proxyTag, domain_suffix: proxyDomainList })
+    if (hasDomainEntries(proxyDomainGroups)) {
+      const rule: any = { action: "route", outbound: proxyTag }
+      applyDomainGroups(rule, proxyDomainGroups)
+      generatedRules.push(rule)
     }
     if (proxyIpList.length > 0) {
       generatedRules.push({ action: "route", outbound: proxyTag, ip_cidr: normalizeIpCidrs(proxyIpList) })

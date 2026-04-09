@@ -627,12 +627,12 @@
     "blockDesc": "Domains and IPs added here will be blocked",
     "domainListLabel": "Domain List (one per line)",
     "ipListLabel": "IP / CIDR List (one per line)",
-    "domainSuffixHint": "Matches by domain suffix (domain_suffix), e.g. {example} matches *.{example}",
-    "directDomainsPlaceholder": "baidu.com\nqq.com\ntaobao.com\n# Lines starting with # are comments",
+    "domainSuffixHint": "Default: suffix match. Prefixes: full: (exact), keyword: (contains), regex: (regex), suffix: (suffix). e.g. google.com matches *.google.com, full:www.google.com matches exactly",
+    "directDomainsPlaceholder": "baidu.com\nqq.com\nfull:www.taobao.com\nkeyword:alipay\n# Lines starting with # are comments",
     "directIpsPlaceholder": "192.168.0.0/16\n10.0.0.0/8\n# Plain IPs will be auto-suffixed with /32",
-    "proxyDomainsPlaceholder": "google.com\nyoutube.com\ngithub.com\n# Lines starting with # are comments",
+    "proxyDomainsPlaceholder": "google.com\nyoutube.com\nfull:www.github.com\nkeyword:openai\n# Lines starting with # are comments",
     "proxyIpsPlaceholder": "8.8.8.8\n1.1.1.1\n# Plain IPs will be auto-suffixed with /32",
-    "blockDomainsPlaceholder": "ads.example.com\ntracker.example.com\n# Lines starting with # are comments",
+    "blockDomainsPlaceholder": "ads.example.com\nkeyword:tracker\nregex:.*\\.ad\\..*\n# Lines starting with # are comments",
     "blockIpsPlaceholder": "# Block specific IPs\n203.0.113.0/24",
     "privateIpLabel": "Private IPs Direct (10.x, 172.16.x, 192.168.x, etc.)",
     "blockAdsLabel": "Block Ad Domains (geosite-category-ads-all)",
@@ -645,7 +645,7 @@
     "enableCnIp": "Enable China IPs Direct",
     "cnIpDesc": "Uses the geoip-cn rule set. Connections to IPs in mainland China will go direct.",
     "cnIpSource": "Source: github.com/SagerNet/sing-geoip",
-    "domainSuffixMethod": "Matches by domain suffix (domain_suffix)"
+    "domainSuffixMethod": "Default: suffix match. Prefixes: full: (exact), keyword: (contains), regex: (regex)"
   },
   "dns": {
     "title": "DNS Config",
