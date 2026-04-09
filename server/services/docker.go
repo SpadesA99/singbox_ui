@@ -529,6 +529,26 @@ func (d *DockerService) StartSpeedTestContainer(hostConfigDir string) error {
 	return nil
 }
 
+// GetSpeedTestContainerLogs 获取测速容器日志（用于诊断启动失败）
+func (d *DockerService) GetSpeedTestContainerLogs() string {
+	reader, err := d.cli.ContainerLogs(d.ctx, SpeedTestContainerName, types.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Tail:       "30",
+	})
+	if err != nil {
+		return fmt.Sprintf("(failed to get logs: %v)", err)
+	}
+	defer reader.Close()
+	var stdout, stderr strings.Builder
+	_, _ = stdcopy.StdCopy(&stdout, &stderr, reader)
+	out := strings.TrimSpace(stderr.String())
+	if out == "" {
+		out = strings.TrimSpace(stdout.String())
+	}
+	return stripAnsi(out)
+}
+
 // StopSpeedTestContainer 停止并删除测速容器
 func (d *DockerService) StopSpeedTestContainer() error {
 	if err := d.cli.ContainerRemove(d.ctx, SpeedTestContainerName, types.ContainerRemoveOptions{
