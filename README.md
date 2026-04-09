@@ -15,7 +15,7 @@
 
 </div>
 
-![Sing-box UI 界面截图](docs/image.png)
+![Sing-box UI 界面截图](docs/zh.png)
 
 ---
 

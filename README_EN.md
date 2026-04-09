@@ -15,7 +15,7 @@ Built with Go 1.24 + Next.js 16, managing sing-box via Docker containers
 
 </div>
 
-![Sing-box UI Screenshot](docs/image.png)
+![Sing-box UI Screenshot](docs/en.png)
 
 ---
 
