@@ -37,6 +37,7 @@ interface ProxyNode {
   online?: boolean
   last_probe?: string
   success_rate?: number
+  speed_kbps?: number
 }
 
 interface SubscriptionEntry {
@@ -677,6 +678,13 @@ export function SubscriptionManager({ onNodeSelect, onNodesLoaded }: Subscriptio
                                   : "text-red-500"
                               }`}>
                                 {node.online ? `${node.latency}ms` : t("timeout")}
+                              </span>
+                            )}
+                            {hasProbeResult && node.online && node.speed_kbps != null && node.speed_kbps > 0 && (
+                              <span className="text-xs font-medium text-blue-500">
+                                {node.speed_kbps >= 1024
+                                  ? `${(node.speed_kbps / 1024).toFixed(1)}MB/s`
+                                  : `${Math.round(node.speed_kbps)}KB/s`}
                               </span>
                             )}
                             <span className="text-xs text-muted-foreground">

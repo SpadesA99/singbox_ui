@@ -236,21 +236,15 @@ func testOneNode(ctx context.Context, node ProxyNode, tag string) (int64, float6
 		return 0, 0, "", fmt.Errorf("docker not initialized")
 	}
 
-	log.Printf("[speedtest] node=%s tag=%s port=%d config:\n%s", node.Name, tag, port, string(cfgBytes))
-
 	if err := ds.StartSpeedTestContainer(dir); err != nil {
 		return 0, 0, "", fmt.Errorf("container start: %w", err)
 	}
 	defer ds.StopSpeedTestContainer()
 
 	if err := waitProxyReady(ctx, port, 10*time.Second); err != nil {
-		// 容器可能已崩溃，捕获日志用于诊断
 		logs := ds.GetSpeedTestContainerLogs()
-		log.Printf("[speedtest] node=%s FAILED proxy not ready. container logs:\n%s", node.Name, logs)
 		return 0, 0, "", fmt.Errorf("proxy not ready (port %d): %s", port, logs)
 	}
-
-	log.Printf("[speedtest] node=%s proxy ready on port %d", node.Name, port)
 
 	proxyURL := fmt.Sprintf("http://127.0.0.1:%d", port)
 	client := newProxyClient(proxyURL, 10*time.Second)
