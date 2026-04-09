@@ -347,13 +347,15 @@ func buildSpeedTestConfig(node ProxyNode, tag string, port int) map[string]inter
 	}
 	outbound["tag"] = tag
 
+	// 全局代理模式：DNS 和所有流量都走代理节点
 	return map[string]interface{}{
 		"log": map[string]interface{}{"level": "warn"},
 		"dns": map[string]interface{}{
 			"servers": []map[string]interface{}{
-				{"tag": "local", "type": "udp", "server": "8.8.8.8", "detour": "direct"},
+				{"tag": "remote_dns", "type": "udp", "server": "8.8.8.8", "detour": tag},
+				{"tag": "local_resolver", "type": "udp", "server": "1.1.1.1"},
 			},
-			"final":             "local",
+			"final":             "remote_dns",
 			"independent_cache": true,
 		},
 		"inbounds": []map[string]interface{}{
@@ -366,12 +368,11 @@ func buildSpeedTestConfig(node ProxyNode, tag string, port int) map[string]inter
 		},
 		"outbounds": []map[string]interface{}{
 			outbound,
-			{"type": "direct", "tag": "direct"},
 		},
 		"route": map[string]interface{}{
 			"rules":                   []interface{}{},
 			"final":                   tag,
-			"default_domain_resolver": "local",
+			"default_domain_resolver": "local_resolver",
 		},
 	}
 }
