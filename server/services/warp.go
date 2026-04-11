@@ -107,6 +107,7 @@ func LoadWarpRecord() (*WarpRecord, error) {
 
 // SaveWarpRecord 保存 WARP 记录
 // 文件权限 0600: 内含 WireGuard 私钥与 Cloudflare Bearer Token, 必须只读于进程所有者
+// 原子写入: 写入临时文件后 rename, 避免进程崩溃导致半写文件破坏已有记录
 func SaveWarpRecord(rec *WarpRecord) error {
 	if err := os.MkdirAll(singboxDir, 0755); err != nil {
 		return err
@@ -116,10 +117,17 @@ func SaveWarpRecord(rec *WarpRecord) error {
 		return err
 	}
 	path := warpRecordPath()
-	if err := os.WriteFile(path, data, 0600); err != nil {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0600); err != nil {
 		return err
 	}
-	// 兜底: 若文件已存在且权限宽松, 显式 chmod
+	// 兜底 chmod, 部分文件系统/umask 可能放宽初始权限
+	_ = os.Chmod(tmp, 0600)
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	// Rename 后再次 chmod, 保证目标文件权限始终 0600
 	_ = os.Chmod(path, 0600)
 	return nil
 }
@@ -254,7 +262,10 @@ func BindWarpLicense(rec *WarpRecord, license string) (*WarpRecord, error) {
 		return nil, fmt.Errorf("绑定 license 请求失败: %w", err)
 	}
 	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取 license 响应失败: %w", err)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("绑定 license 失败 HTTP %d: %s", resp.StatusCode, string(respBody))
 	}
@@ -263,9 +274,27 @@ func BindWarpLicense(rec *WarpRecord, license string) (*WarpRecord, error) {
 		return nil, fmt.Errorf("解析 license 响应失败: %w", err)
 	}
 
-	rec.Device.Account = acct
+	// 字段级合并: CF 的 PUT /account 在不同 API 版本里偶尔返回 partial Account,
+	// 若直接整体替换, 可能把历史字段(premium_data / referral_count 等)清零.
+	// 策略: plan 相关字段以 PUT 响应为准; 数值统计字段仅在响应非零时覆盖.
+	rec.Device.Account.License = acct.License
+	rec.Device.Account.AccountType = acct.AccountType
+	rec.Device.Account.WarpPlus = acct.WarpPlus
+	if acct.ID != "" {
+		rec.Device.Account.ID = acct.ID
+	}
+	if acct.PremiumData > 0 {
+		rec.Device.Account.PremiumData = acct.PremiumData
+	}
+	if acct.ReferralCount > 0 {
+		rec.Device.Account.ReferralCount = acct.ReferralCount
+	}
+	if acct.ReferralRenewalEn > 0 {
+		rec.Device.Account.ReferralRenewalEn = acct.ReferralRenewalEn
+	}
 
-	// Step 2: PATCH /reg/{id} — 某些 license 绑定后需要刷新设备信息（可选，忽略错误）
+	// Step 2: GET /reg/{id} — 某些 license 绑定后需要刷新设备信息
+	// 刷新成功时作为权威状态覆盖 Account, 失败则保留上面的字段级合并结果
 	_ = refreshWarpDevice(rec)
 
 	rec.UpdatedAt = time.Now().Format(time.RFC3339)
