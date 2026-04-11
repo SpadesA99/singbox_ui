@@ -69,6 +69,13 @@ Built with Go 1.24 + Next.js 16, managing sing-box via Docker containers
 - IP-bound key caching
 - Client config management (batch generation, QR codes, config download)
 
+### Cloudflare WARP Outbound
+
+- **One-click registration**: Auto-generates a Curve25519 keypair and calls the Cloudflare registration API; device token is cached locally — no manual setup
+- **WARP+ binding**: Paste a license key to upgrade the device to WARP+ and unlock unlimited bandwidth
+- **Endpoint optimization**: Real WireGuard handshake probing — sends a WG initiation packet to each candidate `IP:Port` and validates the 92-byte `MessageResponse`, then ranks by loss rate + average RTT to accurately reflect UDP path quality (based on [CloudflareWarpSpeedTest](https://github.com/peanut996/CloudflareWarpSpeedTest))
+- **Wide coverage**: Scans 8 Cloudflare /24 subnets × 54 known WARP UDP ports in parallel with shuffled sampling, quickly finding the fastest edge node
+
 ### Node Health Probing
 
 - Async concurrent multi-node probing

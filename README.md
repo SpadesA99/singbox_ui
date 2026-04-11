@@ -69,6 +69,13 @@
 - IP 绑定密钥缓存
 - 客户端配置管理 (批量生成、二维码、配置下载)
 
+### Cloudflare WARP 出站
+
+- **一键注册**: 自动生成 Curve25519 密钥对并调用 Cloudflare 注册 API, 本地缓存设备 token, 无需手动配置
+- **WARP+ 绑定**: 支持填入 License 绑定 WARP+ 账户, 获得无限流量
+- **端点优选**: 真实 WireGuard 握手探测——向候选 `IP:Port` 发送 WG 初始化包, 校验返回的 92 字节 `MessageResponse`, 按丢包率 + 平均 RTT 排序, 精确反映 UDP 路径质量(参考 [CloudflareWarpSpeedTest](https://github.com/peanut996/CloudflareWarpSpeedTest) 实现)
+- **广覆盖扫描**: 8 个 Cloudflare /24 段 × 54 个已知 WARP UDP 端口, 并发探测并打乱采样, 快速找到最快的边缘节点
+
 ### 节点健康探测
 
 - 异步多节点并发探测
