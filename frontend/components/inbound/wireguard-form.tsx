@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -8,6 +8,11 @@ import { Plus, Trash2, Key, QrCode, Download } from "lucide-react"
 import { isValidPort, parsePort, parseErrorResponse } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n"
 import { ProtocolFormProps, LocalPeer } from "./types"
+
+function extractPrivateKeyFromConf(content: string): string | undefined {
+  const match = content.match(/PrivateKey\s*=\s*(\S+)/i)
+  return match?.[1]
+}
 
 function parseKeepaliveSeconds(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value) && value > 0) {
@@ -88,6 +93,102 @@ export function WireguardForm({
 
   const flat = deriveFlat(initialConfig, initialEndpoint)
 
+  // Peer private keys are NOT persisted into the sing-box endpoint (buildWireguardEndpoint
+  // strips them — the server shouldn't hold client private keys). We keep them in local
+  // state keyed by public key so the Download/QR buttons survive re-renders, and fall
+  // back to reading the saved client{N}.conf file on disk when local state is empty
+  // (e.g. after page reload).
+  //
+  // IMPORTANT: the disk filename `client{N}.conf` is assigned by 1-based peer index at
+  // generation time; after a mid-list peer deletion the filename↔peer mapping drifts.
+  // To avoid producing a .conf whose PrivateKey doesn't match the rendered [Peer]
+  // PublicKey, we match disk files by *deriving* the public key from the stored
+  // private key (via /api/wireguard/pubkey) and keying by that — never by filename.
+  const [peerPrivateKeys, setPeerPrivateKeys] = useState<Record<string, string>>({})
+
+  const rememberPeerPrivateKey = useCallback((publicKey: string, privateKey: string) => {
+    if (!publicKey || !privateKey) return
+    setPeerPrivateKeys((prev) =>
+      prev[publicKey] === privateKey ? prev : { ...prev, [publicKey]: privateKey }
+    )
+  }, [])
+
+  const resolvePeerPrivateKey = useCallback(
+    (peer: LocalPeer): string | undefined => {
+      if (peer.publicKey && peerPrivateKeys[peer.publicKey]) return peerPrivateKeys[peer.publicKey]
+      return peer.privateKey
+    },
+    [peerPrivateKeys]
+  )
+
+  const derivePublicKey = useCallback(async (privateKey: string): Promise<string | undefined> => {
+    try {
+      const response = await fetch("/api/wireguard/pubkey", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ privateKey }),
+      })
+      if (!response.ok) return undefined
+      const data = await response.json()
+      return typeof data?.publicKey === "string" ? data.publicKey : undefined
+    } catch {
+      return undefined
+    }
+  }, [])
+
+  // Fetch all persisted client .conf files and return a map keyed by the public key
+  // *derived from* each file's PrivateKey. This avoids the stale filename↔peer-index
+  // drift that occurs after mid-list peer deletions.
+  const loadClientKeysByPublicKey = useCallback(async (): Promise<Record<string, string>> => {
+    try {
+      const response = await fetch("/api/wireguard/client-files")
+      if (!response.ok) return {}
+      const files: { name: string; content: string }[] = await response.json()
+      if (!Array.isArray(files) || files.length === 0) return {}
+      const entries = await Promise.all(
+        files.map(async (f) => {
+          const privateKey = extractPrivateKeyFromConf(f.content)
+          if (!privateKey) return null
+          const publicKey = await derivePublicKey(privateKey)
+          if (!publicKey) return null
+          return [publicKey, privateKey] as const
+        })
+      )
+      const out: Record<string, string> = {}
+      for (const entry of entries) {
+        if (entry) out[entry[0]] = entry[1]
+      }
+      return out
+    } catch {
+      return {}
+    }
+  }, [derivePublicKey])
+
+  // On mount / when peer publicKeys change, hydrate peerPrivateKeys from disk so
+  // post-reload downloads still work. Only keeps entries whose derived publicKey
+  // matches a peer currently in the form.
+  useEffect(() => {
+    let cancelled = false
+    const hydrate = async () => {
+      const loaded = await loadClientKeysByPublicKey()
+      if (cancelled || Object.keys(loaded).length === 0) return
+      const currentPubs = new Set(flat.peers.map((p) => p.publicKey).filter(Boolean))
+      const filtered: Record<string, string> = {}
+      for (const [pub, priv] of Object.entries(loaded)) {
+        if (currentPubs.has(pub)) filtered[pub] = priv
+      }
+      if (cancelled || Object.keys(filtered).length === 0) return
+      // Merge order: freshly generated in-session keys (prev) win over disk values.
+      setPeerPrivateKeys((prev) => ({ ...filtered, ...prev }))
+    }
+    hydrate()
+    return () => {
+      cancelled = true
+    }
+    // Only hydrate when the set of peer public keys changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flat.peers.map((p) => p.publicKey).join("|")])
+
   const updateEndpoint = useCallback((patch: Partial<WgFlat>) => {
     const merged = { ...flat, ...patch }
     setEndpoint(0, buildWireguardEndpoint(merged))
@@ -153,6 +254,8 @@ export function WireguardForm({
       const clientKeys = await response.json()
       const clientIPWithCIDR = `${peerIP}/32`
 
+      rememberPeerPrivateKey(clientKeys.publicKey, clientKeys.privateKey)
+
       const newPeers = [...flat.peers]
       newPeers[peerIndex] = {
         ...newPeers[peerIndex],
@@ -197,30 +300,42 @@ AllowedIPs = 0.0.0.0/0, ::/0
     }
   }
 
-  const downloadPeerConfig = async (peerIndex: number) => {
-    const peer = flat.peers[peerIndex]
-    if (!peer.privateKey || !flat.private_key) {
-      onError(t("generateKeysFirst"))
-      return
-    }
+  const resolveClientPrivateKey = useCallback(
+    async (peer: LocalPeer): Promise<string | undefined> => {
+      const local = resolvePeerPrivateKey(peer)
+      if (local) return local
+      if (!peer.publicKey) return undefined
+      // Disk fallback: load all client .conf files, match by derived public key.
+      const loaded = await loadClientKeysByPublicKey()
+      const match = loaded[peer.publicKey]
+      if (match) rememberPeerPrivateKey(peer.publicKey, match)
+      return match
+    },
+    [loadClientKeysByPublicKey, rememberPeerPrivateKey, resolvePeerPrivateKey]
+  )
 
-    try {
-      const serverPubKeyResponse = await fetch("/api/wireguard/pubkey", {
+  const buildPeerConfContent = async (
+    peer: LocalPeer,
+    clientPrivateKey: string
+  ): Promise<string> => {
+    const [serverPubKeyResponse, publicIPResponse] = await Promise.all([
+      fetch("/api/wireguard/pubkey", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ privateKey: flat.private_key }),
-      })
+      }),
+      fetch("/api/wireguard/public-ip"),
+    ])
+    if (!serverPubKeyResponse.ok) throw new Error(await parseErrorResponse(serverPubKeyResponse))
+    if (!publicIPResponse.ok) throw new Error(await parseErrorResponse(publicIPResponse))
+    const [serverPubKeyData, publicIPData] = await Promise.all([
+      serverPubKeyResponse.json(),
+      publicIPResponse.json(),
+    ])
 
-      if (!serverPubKeyResponse.ok) throw new Error(await parseErrorResponse(serverPubKeyResponse))
-
-      const serverPubKeyData = await serverPubKeyResponse.json()
-      const publicIPResponse = await fetch("/api/wireguard/public-ip")
-      if (!publicIPResponse.ok) throw new Error(await parseErrorResponse(publicIPResponse))
-
-      const publicIPData = await publicIPResponse.json()
-      const clientIP = (peer.allowedIPs[0] || "10.10.0.2/32").split("/")[0]
-      const configContent = `[Interface]
-PrivateKey = ${peer.privateKey}
+    const clientIP = (peer.allowedIPs[0] || "10.10.0.2/32").split("/")[0]
+    return `[Interface]
+PrivateKey = ${clientPrivateKey}
 Address = ${clientIP}/32
 DNS = 1.1.1.1, 8.8.8.8
 
@@ -230,6 +345,23 @@ Endpoint = ${publicIPData.ip}:${flat.listen_port}
 AllowedIPs = 0.0.0.0/0, ::/0
 PersistentKeepalive = 25
 `
+  }
+
+  const downloadPeerConfig = async (peerIndex: number) => {
+    onError("")
+    const peer = flat.peers[peerIndex]
+    if (!flat.private_key) {
+      onError(t("generateKeysFirst"))
+      return
+    }
+
+    try {
+      const clientPrivateKey = await resolveClientPrivateKey(peer)
+      if (!clientPrivateKey) {
+        onError(t("generateKeysFirst"))
+        return
+      }
+      const configContent = await buildPeerConfContent(peer, clientPrivateKey)
       const blob = new Blob([configContent], { type: "text/plain" })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -245,38 +377,20 @@ PersistentKeepalive = 25
   }
 
   const showPeerQrCode = async (peerIndex: number) => {
+    onError("")
     const peer = flat.peers[peerIndex]
-    if (!peer.privateKey || !flat.private_key) {
+    if (!flat.private_key) {
       onError(t("generateKeysFirst"))
       return
     }
 
     try {
-      const serverPubKeyResponse = await fetch("/api/wireguard/pubkey", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ privateKey: flat.private_key }),
-      })
-
-      if (!serverPubKeyResponse.ok) throw new Error(await parseErrorResponse(serverPubKeyResponse))
-
-      const serverPubKeyData = await serverPubKeyResponse.json()
-      const publicIPResponse = await fetch("/api/wireguard/public-ip")
-      if (!publicIPResponse.ok) throw new Error(await parseErrorResponse(publicIPResponse))
-
-      const publicIPData = await publicIPResponse.json()
-      const clientIP = (peer.allowedIPs[0] || "10.10.0.2/32").split("/")[0]
-      const configContent = `[Interface]
-PrivateKey = ${peer.privateKey}
-Address = ${clientIP}/32
-DNS = 1.1.1.1, 8.8.8.8
-
-[Peer]
-PublicKey = ${serverPubKeyData.publicKey}
-Endpoint = ${publicIPData.ip}:${flat.listen_port}
-AllowedIPs = 0.0.0.0/0, ::/0
-PersistentKeepalive = 25`
-
+      const clientPrivateKey = await resolveClientPrivateKey(peer)
+      if (!clientPrivateKey) {
+        onError(t("generateKeysFirst"))
+        return
+      }
+      const configContent = (await buildPeerConfContent(peer, clientPrivateKey)).trimEnd()
       onShowQrCode(configContent, "wireguard", peerIndex)
     } catch (err) {
       onError(err instanceof Error ? err.message : t("generateQrCodeFailed"))
@@ -358,7 +472,9 @@ PersistentKeepalive = 25`
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
-          {flat.peers.map((peer, index) => (
+          {flat.peers.map((peer, index) => {
+            const resolvedPrivateKey = resolvePeerPrivateKey(peer)
+            return (
             <div key={index} className="p-6 rounded-2xl bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-zinc-100 dark:border-zinc-800 relative group transition-all duration-300">
               <div className="space-y-4">
                 <div className="flex justify-between items-center mb-1">
@@ -372,7 +488,7 @@ PersistentKeepalive = 25`
                     <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-zinc-400 hover:text-primary hover:bg-primary/5 rounded-full" onClick={() => generatePeerKeys(index)} title={t("generateKey")}>
                       <Key className="h-4 w-4" />
                     </Button>
-                    {peer.privateKey && (
+                    {peer.publicKey && (
                       <>
                         <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-zinc-400 hover:text-primary hover:bg-primary/5 rounded-full" onClick={() => showPeerQrCode(index)} title={t("qrCode")}>
                           <QrCode className="h-4 w-4" />
@@ -410,10 +526,10 @@ PersistentKeepalive = 25`
                       />
                     </div>
 
-                    {peer.privateKey && (
+                    {resolvedPrivateKey && (
                       <div className="space-y-1.5">
                         <Label className="text-xs text-zinc-500">{t("privateKeyPeer")}</Label>
-                        <Input value={peer.privateKey} readOnly className="font-mono h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus-visible:ring-primary/20" />
+                        <Input value={resolvedPrivateKey} readOnly className="font-mono h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm focus-visible:ring-primary/20" />
                       </div>
                     )}
 
@@ -467,7 +583,8 @@ PersistentKeepalive = 25`
                 </div>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>
