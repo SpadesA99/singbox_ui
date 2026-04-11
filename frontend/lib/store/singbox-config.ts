@@ -1657,6 +1657,29 @@ export const useSingboxConfigStore = create<SingboxConfigStore>((set, get) => ({
       }
     }
 
+    // sing-box 1.11.0 起弃用 wireguard 作为 outbound, 1.13.0 彻底移除。
+    // UI 各处（WireGuard / WARP tab, 订阅解析等）仍以 setOutbound(0, ...) 的形式
+    // 写入, 这里在序列化阶段统一迁移到 endpoints[], 以避免
+    //   `outbounds[0].address: json: unknown field "address"` 这类 FATAL 错误。
+    // 规则:
+    //   1. outbounds 中所有 type==="wireguard" 的条目抽出
+    //   2. 按 tag 合并到 config.endpoints (相同 tag → 替换, 新 tag → 追加)
+    //   3. outbounds 中仅保留非 wireguard 条目
+    const wgFromOutbounds = outbounds.filter((o) => o.type === "wireguard")
+    outbounds = outbounds.filter((o) => o.type !== "wireguard")
+
+    const mergedEndpoints: Endpoint[] = [...(config.endpoints || [])]
+    for (const wg of wgFromOutbounds) {
+      const idx = wg.tag
+        ? mergedEndpoints.findIndex((ep) => ep.tag && ep.tag === wg.tag)
+        : -1
+      if (idx >= 0) {
+        mergedEndpoints[idx] = wg as unknown as Endpoint
+      } else {
+        mergedEndpoints.push(wg as unknown as Endpoint)
+      }
+    }
+
     // Ensure direct and block outbounds exist if route is configured
     if (config.route && config.route.rules && config.route.rules.length > 0) {
       const hasDirectTag = outbounds.some((o) => o.tag === "direct")
@@ -1675,7 +1698,7 @@ export const useSingboxConfigStore = create<SingboxConfigStore>((set, get) => ({
       log: config.log,
       dns: config.dns,
       // Filter out invalid endpoints (e.g., WireGuard without private_key)
-      endpoints: (config.endpoints || []).filter((ep) => {
+      endpoints: mergedEndpoints.filter((ep) => {
         if (ep.type === "wireguard") {
           return ep.private_key && ep.private_key.length > 0
         }
@@ -1690,14 +1713,20 @@ export const useSingboxConfigStore = create<SingboxConfigStore>((set, get) => ({
       delete fullConfig.endpoints
     }
 
-    // Check if there's a proxy outbound (not direct, block, or dns type)
+    // Check if there's a proxy outbound or endpoint (not direct/block/dns)
+    // endpoint 与 outbound 共享 tag 命名空间, route.final 可引用两者
     const hasProxyOutbound = outbounds.some((o) =>
       o.type !== "direct" && o.type !== "block" && o.type !== "dns"
+    ) || (fullConfig.endpoints || []).some((ep) =>
+      ep.type !== "direct" && ep.type !== "block" && ep.type !== "dns"
     )
-    // If no proxy outbound exists, add a direct outbound with tag "proxy_out"
+    const hasProxyOutTag = outbounds.some((o) => o.tag === "proxy_out") ||
+      (fullConfig.endpoints || []).some((ep) => ep.tag === "proxy_out")
+    // If no proxy outbound/endpoint exists, add a direct outbound with tag "proxy_out"
     // This ensures route.final: "proxy_out" always works
-    if (!hasProxyOutbound && !outbounds.some((o) => o.tag === "proxy_out")) {
+    if (!hasProxyOutbound && !hasProxyOutTag) {
       outbounds.push({ type: "direct", tag: "proxy_out" })
+      fullConfig.outbounds = outbounds
     }
 
     // Auto-fill domain_resolver for DNS servers that use domain addresses (https/tls/quic/h3)
