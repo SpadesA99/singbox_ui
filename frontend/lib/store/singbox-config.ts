@@ -1771,12 +1771,31 @@ export const useSingboxConfigStore = create<SingboxConfigStore>((set, get) => ({
     }
 
     // Proxy outbound (non-balancer): override DNS and route with minimal global-proxy config
-    // local_resolver resolves the proxy server's own address; remote_dns handles client traffic
+    //
+    // DNS 设计要点 (防 DNS 反馈环, 这是 WARP 模式"无法上网"的根因):
+    //   - remote_dns 通过 proxy_out 出站, 用于用户流量 DNS, 防污染/泄漏
+    //   - local_resolver *必须* 明确 detour 到 direct 出站, 不能依赖 route.final
+    //     否则 local_resolver 的查询也会被 route.final: "proxy_out" 吸入隧道,
+    //     WG 握手未完成期间整个系统在 DNS 环上僵死, 日志形如:
+    //       "lookup xxx: (exchange6: context deadline exceeded | exchange4: ...)"
+    //   - default_domain_resolver 指向 local_resolver, 让路由规则/WG peer 域名解析
+    //     在隧道尚未建立时也能完成 (WARP peer 通常是 IP, 但用户手写 WG 可能是域名)
+    //   - dns.final 仍是 remote_dns: 用户正常上网时域名通过 WARP 解析
     if (!balancerState.enabled) {
+      // 确保 outbounds 里存在一条 direct 出站供 local_resolver 使用.
+      // WARP 场景下 outbounds 通常是空的 (所有 wireguard 已迁到 endpoints[]),
+      // 若不补 direct, local_resolver 没有 detour 可以指向.
+      let directTag = outbounds.find((o) => o.type === "direct")?.tag
+      if (!directTag) {
+        directTag = "direct-out"
+        outbounds.push({ type: "direct", tag: directTag })
+        fullConfig.outbounds = outbounds
+      }
+
       fullConfig.dns = {
         servers: [
           { tag: "remote_dns", type: "udp", server: "8.8.8.8", detour: "proxy_out" },
-          { tag: "local_resolver", type: "udp", server: "1.1.1.1" },
+          { tag: "local_resolver", type: "udp", server: "1.1.1.1", detour: directTag },
         ],
         final: "remote_dns",
         independent_cache: true,
@@ -1789,8 +1808,14 @@ export const useSingboxConfigStore = create<SingboxConfigStore>((set, get) => ({
       return fullConfig
     }
 
-    // Balancer mode: build urltest outbound and route from existing config
-    const validOutboundTags = new Set(outbounds.map((o) => o.tag))
+    // Balancer mode: build urltest outbound and route from existing config.
+    // 含 endpoints[] 的 tag 是因为 WireGuard/WARP 已从 outbounds 迁到 endpoints
+    // (见 getFullConfig 开头的迁移逻辑), 二者共享 tag 命名空间;
+    // 若这里只取 outbounds, 路由规则中指向 WG/WARP 的 tag 会被误过滤.
+    const validOutboundTags = new Set<string>([
+      ...outbounds.map((o) => o.tag),
+      ...mergedEndpoints.map((ep) => ep.tag).filter((t): t is string => typeof t === "string" && t.length > 0),
+    ])
 
     // Helper function to generate rule_set definitions for used rule_set tags
     // Collects from both route rules and DNS rules
