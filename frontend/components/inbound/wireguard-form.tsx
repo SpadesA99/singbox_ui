@@ -212,41 +212,9 @@ export function WireguardForm({
       newPeers[peerIndex] = {
         ...newPeers[peerIndex],
         publicKey: clientKeys.publicKey,
-        privateKey: clientKeys.privateKey,
         allowedIPs: [clientIPWithCIDR],
       }
       updateEndpoint({ peers: newPeers })
-
-      if (flat.private_key) {
-        const serverPubKeyResponse = await fetch("/api/wireguard/pubkey", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ privateKey: flat.private_key }),
-        })
-
-        if (serverPubKeyResponse.ok) {
-          const serverPubKeyData = await serverPubKeyResponse.json()
-          const configContent = `[Interface]
-PrivateKey = ${clientKeys.privateKey}
-Address = ${peerIP}/32
-DNS = 1.1.1.1, 8.8.8.8
-
-[Peer]
-PublicKey = ${serverPubKeyData.publicKey}
-Endpoint = your-server-ip:${flat.listen_port}
-AllowedIPs = 0.0.0.0/0, ::/0
-`
-          try {
-            await fetch("/api/wireguard/save-client-file", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ clientIndex: peerIndex + 1, configContent }),
-            })
-          } catch (err) {
-            console.warn("Failed to save client config file:", err)
-          }
-        }
-      }
     } catch (err) {
       onError(err instanceof Error ? err.message : t("generateKeysFailed"))
     }
@@ -414,7 +382,7 @@ PersistentKeepalive = 25
                     <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-zinc-400 hover:text-primary hover:bg-primary/5 rounded-full" onClick={() => generatePeerKeys(index)} title={t("generateKey")}>
                       <Key className="h-4 w-4" />
                     </Button>
-                    {peer.publicKey && (
+                    {resolvedPrivateKey && (
                       <>
                         <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-zinc-400 hover:text-primary hover:bg-primary/5 rounded-full" onClick={() => showPeerQrCode(index)} title={t("qrCode")}>
                           <QrCode className="h-4 w-4" />
