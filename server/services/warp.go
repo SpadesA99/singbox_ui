@@ -64,7 +64,7 @@ type WarpAccount struct {
 	PremiumData       int64  `json:"premium_data"`
 	WarpPlus          bool   `json:"warp_plus"`
 	ReferralCount     int    `json:"referral_count"`
-	ReferralRenewalEn bool   `json:"referral_renewal_countdown"`
+	ReferralRenewalEn int64  `json:"referral_renewal_countdown"`
 }
 
 // WarpRegisterResponse /reg 返回体
