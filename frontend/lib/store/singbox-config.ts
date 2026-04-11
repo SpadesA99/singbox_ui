@@ -1713,13 +1713,28 @@ export const useSingboxConfigStore = create<SingboxConfigStore>((set, get) => ({
       delete fullConfig.endpoints
     }
 
-    // Check if there's a proxy outbound or endpoint (not direct/block/dns)
-    // endpoint 与 outbound 共享 tag 命名空间, route.final 可引用两者
+    // Check if there's a proxy outbound or an outbound-role endpoint.
+    // endpoint 与 outbound 共享 tag 命名空间, route.final 可引用两者, 但 WG endpoint
+    // 在 config.endpoints 里代表"入站 VPN 服务器"角色 (WireguardForm 写入, tag 通常
+    // 是 wireguard-ep, 纯等待 peer 连入), 这类 endpoint 不应被误算成代理出站；
+    // 只有从 outbounds[] 迁移过来的 WG endpoint (wgFromOutbounds) 才是代理出站角色。
+    //
+    // 之前这里没做区分, 纯 WG 入站场景会让 hasProxyOutbound 误判为 true, 跳过了
+    // proxy_out fallback, 而后续 L1783 分支仍然硬编码 route.final: "proxy_out" 与
+    // dns.servers[0].detour: "proxy_out", 最终 sing-box 启动报
+    //   "default outbound not found: proxy_out" 而无法启动。
+    const wgOutboundTags = new Set(
+      wgFromOutbounds.map((o) => o.tag).filter((t): t is string => typeof t === "string" && t.length > 0)
+    )
     const hasProxyOutbound = outbounds.some((o) =>
       o.type !== "direct" && o.type !== "block" && o.type !== "dns"
-    ) || (fullConfig.endpoints || []).some((ep) =>
-      ep.type !== "direct" && ep.type !== "block" && ep.type !== "dns"
-    )
+    ) || (fullConfig.endpoints || []).some((ep) => {
+      if (ep.type === "direct" || ep.type === "block" || ep.type === "dns") return false
+      // WG endpoint: 只有从 outbounds 迁移过来的才算代理出站
+      if (ep.type === "wireguard") return !!ep.tag && wgOutboundTags.has(ep.tag)
+      // 其他 endpoint 类型 (未来扩展) 默认按代理出站处理
+      return true
+    })
     const hasProxyOutTag = outbounds.some((o) => o.tag === "proxy_out") ||
       (fullConfig.endpoints || []).some((ep) => ep.tag === "proxy_out")
     // If no proxy outbound/endpoint exists, add a direct outbound with tag "proxy_out"
