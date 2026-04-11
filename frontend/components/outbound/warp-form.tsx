@@ -79,6 +79,10 @@ export function WarpForm({ setOutbound }: OutboundFormProps) {
   const [endpoints, setEndpoints] = useState<WarpEndpoint[]>([])
 
   const loadedRef = useRef(false)
+  // 注册/应用出站的 ref 级互斥锁: setApplying 是异步 state,
+  // 两次紧挨着的点击会在第一次 setApplying(true) 刷入前同时进入 applyOutbound,
+  // 导致 CF 侧产生两个孤儿设备. ref 是同步可见的, 关上后立刻生效.
+  const applyingRef = useRef(false)
 
   // 加载已缓存的 WARP 账户
   useEffect(() => {
@@ -97,6 +101,10 @@ export function WarpForm({ setOutbound }: OutboundFormProps) {
   }, [])
 
   async function applyOutbound(opts: { force?: boolean; license?: string }) {
+    // 同步 ref 锁: 在 state 更新刷入前就拒绝第二次调用,
+    // 避免双击/并发产生两个 CF 设备.
+    if (applyingRef.current) return
+    applyingRef.current = true
     setApplying(true)
     try {
       const body = {
@@ -124,6 +132,7 @@ export function WarpForm({ setOutbound }: OutboundFormProps) {
         variant: "destructive",
       })
     } finally {
+      applyingRef.current = false
       setApplying(false)
     }
   }
