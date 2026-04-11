@@ -14,6 +14,14 @@ import (
 // warpScanInFlight 全局扫描互斥标记: 防止并发扫描产生指数级 TCP dial
 var warpScanInFlight atomic.Bool
 
+// warpRegisterInFlight 全局注册互斥标记: 防止双击/并发导致孤儿账户,
+// 因 CF /reg 每次调用都会创建新设备, 重复注册会浪费配额并使先前的
+// bearer token 失效(先前的 warp-account.json 被后写入的记录覆盖).
+var warpRegisterInFlight atomic.Bool
+
+// warpRegisterMaxBody 注册请求体上限: 防止恶意大体消耗内存
+const warpRegisterMaxBody = 8 * 1024
+
 // warpAccountView 对前端暴露的账户信息(不含 token)
 type warpAccountView struct {
 	Exists    bool   `json:"exists"`
@@ -80,6 +88,17 @@ type WarpRegisterResponse struct {
 
 // RegisterWarp POST /api/warp/register — 注册 WARP 并生成出站配置
 func RegisterWarp(c *gin.Context) {
+	// 并发互斥: 避免前端双击或多标签并发调用导致 CF 侧产生多个孤儿设备,
+	// 后写入的 warp-account.json 会覆盖先前的 bearer token 使之失效.
+	if !warpRegisterInFlight.CompareAndSwap(false, true) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "register already running"})
+		return
+	}
+	defer warpRegisterInFlight.Store(false)
+
+	// Body 大小限制: WarpRegisterRequest 只含少量字段, 8KB 远超合理上限
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, warpRegisterMaxBody)
+
 	var req WarpRegisterRequest
 	// 接受空请求体(io.EOF),但拒绝格式错误的 JSON —— 否则字段会被静默置零
 	if err := c.ShouldBindJSON(&req); err != nil && err != io.EOF {
@@ -135,6 +154,9 @@ type WarpBindLicenseRequest struct {
 
 // BindWarpLicense POST /api/warp/license — 为已注册设备绑定 WARP+ 许可证
 func BindWarpLicense(c *gin.Context) {
+	// Body 大小限制: license 字符串很短, 8KB 足以防御恶意大包
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, warpRegisterMaxBody)
+
 	var req WarpBindLicenseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -166,6 +188,9 @@ func ScanWarpEndpoints(c *gin.Context) {
 	}
 	defer warpScanInFlight.Store(false)
 
+	// Body 大小限制: 扫描请求只含少量整数, 8KB 足够
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, warpRegisterMaxBody)
+
 	cfg := services.DefaultWarpScanConfig()
 
 	var body struct {
@@ -177,13 +202,26 @@ func ScanWarpEndpoints(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON body: " + err.Error()})
 		return
 	}
-	if body.SamplePerRange > 0 && body.SamplePerRange <= 32 {
+	// 参数越界时显式 400, 而不是静默降级到默认值 —— 否则用户调大参数不会察觉无效
+	if body.SamplePerRange != 0 {
+		if body.SamplePerRange < 1 || body.SamplePerRange > 32 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "sample_per_range must be in [1, 32]"})
+			return
+		}
 		cfg.SamplePerRange = body.SamplePerRange
 	}
-	if body.TimeoutMs > 0 && body.TimeoutMs <= 5000 {
+	if body.TimeoutMs != 0 {
+		if body.TimeoutMs < 100 || body.TimeoutMs > 5000 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "timeout_ms must be in [100, 5000]"})
+			return
+		}
 		cfg.Timeout = time.Duration(body.TimeoutMs) * time.Millisecond
 	}
-	if body.TopN > 0 && body.TopN <= 32 {
+	if body.TopN != 0 {
+		if body.TopN < 1 || body.TopN > 32 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "top_n must be in [1, 32]"})
+			return
+		}
 		cfg.TopN = body.TopN
 	}
 
