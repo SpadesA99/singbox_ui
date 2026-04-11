@@ -20,6 +20,7 @@ import { WireguardForm } from "./wireguard-form"
 import { ShadowsocksForm } from "./shadowsocks-form"
 import { Hysteria2Form } from "./hysteria2-form"
 import { AnytlsForm } from "./anytls-form"
+import { WarpForm } from "./warp-form"
 
 interface ProxyNode {
   name: string
@@ -230,6 +231,7 @@ export function OutboundConfig({ showCard = true }: OutboundConfigProps) {
           <TabsTrigger className={tabTriggerClass} value="hysteria2">Hysteria2</TabsTrigger>
           <TabsTrigger className={tabTriggerClass} value="anytls">AnyTLS</TabsTrigger>
           <TabsTrigger className={tabTriggerClass} value="wireguard">WireGuard</TabsTrigger>
+          <TabsTrigger className={tabTriggerClass} value="warp">WARP</TabsTrigger>
           <TabsTrigger className={tabTriggerClass} value="socks">Socks</TabsTrigger>
           <TabsTrigger className={tabTriggerClass} value="http">HTTP</TabsTrigger>
         </TabsList>
@@ -419,6 +421,7 @@ export function OutboundConfig({ showCard = true }: OutboundConfigProps) {
             <TabsContent value="socks"><SocksForm {...formProps} /></TabsContent>
             <TabsContent value="http"><HttpForm {...formProps} /></TabsContent>
             <TabsContent value="wireguard"><WireguardForm {...formProps} /></TabsContent>
+            <TabsContent value="warp"><WarpForm {...formProps} /></TabsContent>
             <TabsContent value="shadowsocks"><ShadowsocksForm {...formProps} /></TabsContent>
             <TabsContent value="hysteria2"><Hysteria2Form {...formProps} /></TabsContent>
             <TabsContent value="anytls"><AnytlsForm {...formProps} /></TabsContent>

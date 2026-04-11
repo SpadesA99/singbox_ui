@@ -121,6 +121,16 @@ func main() {
 			speedtest.POST("/stop", handlers.StopSpeedTest)
 		}
 
+		// Cloudflare WARP：自动注册、WARP+ 许可证绑定、端点扫描
+		warp := api.Group("/warp")
+		{
+			warp.GET("/account", handlers.GetWarpAccount)
+			warp.DELETE("/account", handlers.DeleteWarpAccount)
+			warp.POST("/register", handlers.RegisterWarp)
+			warp.POST("/license", handlers.BindWarpLicense)
+			warp.POST("/scan", handlers.ScanWarpEndpoints)
+		}
+
 	}
 
 	// 健康检查
